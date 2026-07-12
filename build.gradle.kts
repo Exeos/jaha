@@ -1,0 +1,41 @@
+plugins {
+    id("java")
+    id("com.gradleup.shadow") version "8.3.5"
+}
+
+group = "me.exeos"
+version = "1.0.0"
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
+}
+
+dependencies {
+    implementation("org.ow2.asm:asm:9.10.1")
+    implementation("org.ow2.asm:asm-commons:9.10.1")
+    implementation("org.ow2.asm:asm-util:9.10.1")
+    implementation("org.ow2.asm:asm-tree:9.10.1")
+    implementation("org.ow2.asm:asm-analysis:9.10.1")
+}
+
+tasks.shadowJar {
+    manifest {
+        attributes(
+            "Premain-Class" to "me.exeos.jaha.test.AgentMain",
+            "Agent-Class" to "me.exeos.jaha.test.AgentMain",
+            "Can-Retransform-Classes" to "true",
+            "Can-Redefine-Classes" to "true",
+        )
+    }
+    archiveClassifier.set("")
+}
+
+tasks.jar {
+    enabled = false
+}
