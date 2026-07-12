@@ -24,6 +24,22 @@ dependencies {
     implementation("org.ow2.asm:asm-analysis:9.10.1")
 }
 
+sourceSets {
+    main {
+        resources {
+            srcDir(project(":native").layout.buildDirectory.dir("lib"))
+        }
+    }
+}
+
+tasks.compileJava {
+    options.compilerArgs.addAll(listOf("-h", layout.buildDirectory.dir("generated/jni").get().asFile.absolutePath))
+}
+
+tasks.named("processResources") {
+    dependsOn(":native:buildNative")
+}
+
 tasks.shadowJar {
     manifest {
         attributes(
