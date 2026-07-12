@@ -10,55 +10,44 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.io.IOException;
-import java.lang.instrument.ClassFileTransformer;
-import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
-import java.security.ProtectionDomain;
 import java.util.HashMap;
 import java.util.Map;
 
 public class Jaha {
 
-    public static final Jaha INSTANCE = new Jaha();
+    private static final Map<String, ClassNode> hooks = new HashMap<>();
 
-    private final Map<String, ClassNode> hooks = new HashMap<>();
-
-    private Jaha() {}
-
-    public void premain(String agentArgs, Instrumentation inst) {
-        inst.addTransformer(new ClassFileTransformer() {
-
-            @Override
-            public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
-                ClassNode hook = hooks.get(className);
-                if (hook == null) {
-                    return classfileBuffer;
-                }
-
-                Map<String, MethodNode> toBeReplaced = new HashMap<>();
-                for (MethodNode methodNode : hook.methods) {
-                    if (ASMUtil.hasAnnotation(methodNode, Apply.class.getName().replace(".", "/"))) {
-                        toBeReplaced.put(methodNode.name + methodNode.desc, methodNode);
-                    }
-                }
-
-                ClassNode classNode = new ClassNode(Opcodes.ASM9);
-                ClassReader cr = new ClassReader(classfileBuffer);
-                cr.accept(classNode, 0);
-
-                for (MethodNode methodNode : classNode.methods.toArray(new MethodNode[0])) {
-                    if (toBeReplaced.containsKey(methodNode.name + methodNode.desc)) {
-                        classNode.methods.remove(methodNode);
-                        classNode.methods.add(toBeReplaced.get(methodNode.name + methodNode.desc));
-                    }
-                }
-
-                ClassWriter cw = new ClassWriter(0);
-                classNode.accept(cw);
-
-                return cw.toByteArray();
+    public static void load(Instrumentation inst) {
+        inst.addTransformer((loader, className, classBeingRedefined, protectionDomain, classfileBuffer) -> {
+            ClassNode hook = hooks.get(className);
+            if (hook == null) {
+                return classfileBuffer;
             }
+
+            Map<String, MethodNode> toBeReplaced = new HashMap<>();
+            for (MethodNode methodNode : hook.methods) {
+                if (ASMUtil.hasAnnotation(methodNode, Apply.class.getName().replace(".", "/"))) {
+                    toBeReplaced.put(methodNode.name + methodNode.desc, methodNode);
+                }
+            }
+
+            ClassNode classNode = new ClassNode(Opcodes.ASM9);
+            ClassReader cr = new ClassReader(classfileBuffer);
+            cr.accept(classNode, 0);
+
+            for (MethodNode methodNode : classNode.methods.toArray(new MethodNode[0])) {
+                if (toBeReplaced.containsKey(methodNode.name + methodNode.desc)) {
+                    classNode.methods.remove(methodNode);
+                    classNode.methods.add(toBeReplaced.get(methodNode.name + methodNode.desc));
+                }
+            }
+
+            ClassWriter cw = new ClassWriter(0);
+            classNode.accept(cw);
+
+            return cw.toByteArray();
         }, true);
 
         for (String className : hooks.keySet()) {
@@ -70,7 +59,7 @@ public class Jaha {
         }
     }
 
-    public void register(Class<?> hook) {
+    public static void register(Class<?> hook) {
         if (!hook.isAnnotationPresent(Hook.class)) {
             throw new IllegalArgumentException(hook.getName() + " must be annotated with @Hook");
         }
