@@ -7,8 +7,7 @@ import java.lang.instrument.Instrumentation;
 public class AgentMain {
 
     public static void premain(String idk, Instrumentation is) {
-//        Jaha.register(ZelixBypass.class);
-        Jaha.register(SCHook.class);
+        Jaha.register(ToStringHook.class);
 
         Jaha.load(is);
     }
