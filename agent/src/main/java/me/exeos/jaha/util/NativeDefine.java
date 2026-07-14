@@ -18,18 +18,27 @@ public class NativeDefine {
     }
 
     private static void loadFromResources() throws IOException {
-        String os = System.getProperty("os.name").toLowerCase();
-        String libName = os.contains("win") ? "jahanative.dll"
-                : os.contains("mac") ? "libjahanative.dylib"
-                  : "libjahanative.so";
+        String libName = getLibName();
 
         try (InputStream in = NativeDefine.class.getResourceAsStream("/" + libName)) {
-            if (in == null) throw new FileNotFoundException(libName + " not found in resources");
-            Path temp = Files.createTempFile("jahanative", libName.substring(libName.lastIndexOf('.')));
+            if (in == null) {
+                throw new FileNotFoundException(libName + " not found in resources. Platform might not be supported.");
+            }
+
+            Path temp = Files.createTempFile(libName, "");
             temp.toFile().deleteOnExit();
             Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
             System.load(temp.toAbsolutePath().toString());
         }
+    }
+
+    private static String getLibName() {
+        String os = System.getProperty("os.name").split(" ")[0].toLowerCase();
+        String arch = System.getProperty("os.arch")
+                .replace("amd64", "x64")
+                .replace("x86_64", "x64");
+
+        return "jaha." + os + "-" + arch;
     }
 
     public static native Class<?> defineBootstrapClass(String name, byte[] data);

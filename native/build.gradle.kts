@@ -2,40 +2,40 @@ plugins {
     id("base")
 }
 
-val jniIncludeDir = System.getProperty("java.home") + "/include"
-val jniPlatformIncludeDir = when {
-    org.gradle.internal.os.OperatingSystem.current().isWindows -> "$jniIncludeDir/win32"
-    org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "$jniIncludeDir/darwin"
-    else -> "$jniIncludeDir/linux"
-}
+data class NativeTarget(val target: String, val platformDir: String, val outputName: String)
 
-val libName = when {
-    org.gradle.internal.os.OperatingSystem.current().isWindows -> "jahanative.dll"
-    org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "libjahanative.dylib"
-    else -> "libjahanative.so"
-}
+val targets = listOf(
+    NativeTarget("x86_64-windows-gnu", "win32", "jaha.windows-x64"),
+    NativeTarget("x86_64-linux-gnu",   "linux", "jaha.linux-x64"),
+    NativeTarget("x86_64-macos",       "darwin", "jaha.mac-x64"),
+    NativeTarget("aarch64-macos",      "darwin", "jaha.mac-aarch64")
+)
 
+val includeDir = file("include")
 val generatedHeaderDir = project(":agent").layout.buildDirectory.dir("generated/jni")
 val outputDir = layout.buildDirectory.dir("lib")
 
-tasks.register<Exec>("buildNative") {
-    dependsOn(":agent:compileJava") // for jni headers
+val buildTasks = targets.map { t ->
+    tasks.register<Exec>("buildNative_${t.target}") {
+        dependsOn(":agent:compileJava")
 
-    val output = outputDir.get().asFile
-    doFirst { output.mkdirs() }
+        val out = outputDir.get().asFile
+        doFirst { out.mkdirs() }
 
-    workingDir = file("src/main/cpp")
-    val outFile = output.resolve(libName).absolutePath
-
-    commandLine(
-        "g++", "-shared", "-fPIC", "-O2",
-        "-I$jniIncludeDir", "-I$jniPlatformIncludeDir",
-        "-I${generatedHeaderDir.get().asFile.absolutePath}",
-        "define_class.cpp",
-        "-o", outFile
-    )
+        workingDir = file("src/main/cpp")
+        commandLine(
+            "zig", "c++",
+            "-target", t.target,
+            "-shared", "-O2",
+            "-I${includeDir.absolutePath}", // jni.h
+            "-I${includeDir.resolve(t.platformDir).absolutePath}", // jni_md.h
+            "-I${generatedHeaderDir.get().asFile.absolutePath}",
+            "define_class.cpp",
+            "-o", out.resolve(t.outputName).absolutePath
+        )
+    }
 }
 
-tasks.build {
-    dependsOn("buildNative")
+tasks.register("buildNative") {
+    dependsOn(buildTasks)
 }

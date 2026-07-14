@@ -9,6 +9,7 @@ public class ZelixBypass {
 
     @Apply
     public String toString() {
-        return (String) Jaha.callOriginalObjectMethod();
+        String original = (String) Jaha.callOriginalObjectMethod();
+        return "Exeos ist tuff: " + original;
     }
 }

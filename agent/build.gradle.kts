@@ -24,20 +24,16 @@ dependencies {
     implementation("org.ow2.asm:asm-analysis:9.10.1")
 }
 
-sourceSets {
-    main {
-        resources {
-            srcDir(project(":native").layout.buildDirectory.dir("lib"))
-        }
-    }
-}
-
 tasks.compileJava {
     options.compilerArgs.addAll(listOf("-h", layout.buildDirectory.dir("generated/jni").get().asFile.absolutePath))
 }
 
-tasks.named("processResources") {
+tasks.named<ProcessResources>("processResources") {
     dependsOn(":native:buildNative")
+    from(project(":native").layout.buildDirectory.dir("lib")) {
+        include("jaha.*")
+        exclude("**/*.lib", "**/*.pdb", "**/*.exp")
+    }
 }
 
 tasks.shadowJar {

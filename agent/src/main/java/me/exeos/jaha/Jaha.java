@@ -2,7 +2,10 @@ package me.exeos.jaha;
 
 import me.exeos.jaha.annotations.Apply;
 import me.exeos.jaha.annotations.Hook;
+import me.exeos.jaha.runtime.MemberAccessor;
+import me.exeos.jaha.runtime.UnsafeUtil;
 import me.exeos.jaha.util.ASMUtil;
+import me.exeos.jaha.util.DefineUtil;
 import me.exeos.jaha.util.NativeDefine;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -72,17 +75,10 @@ public class Jaha {
                             hookedMethod.instructions.remove(insnNode);
                         });
 
-                        System.out.println("Replace method " + methodId);
-                        System.out.println(hookedMethod);
                         classNode.methods.remove(methodNode);
                         classNode.methods.add(hookedMethod);
                     }
                 }
-
-                ClassWriter cloneContainerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-                cloneContainer.accept(cloneContainerWriter);
-                byte[] cloneContainerData = cloneContainerWriter.toByteArray();
-                NativeDefine.defineBootstrapClass(cloneContainer.name, cloneContainerData);
 
                 ClassWriter cw = new ClassWriter(0);
                 classNode.accept(cw);
@@ -102,6 +98,15 @@ public class Jaha {
                 throw new RuntimeException(e);
             }
         }
+
+        ClassWriter cloneContainerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        cloneContainer.accept(cloneContainerWriter);
+        byte[] cloneContainerData = cloneContainerWriter.toByteArray();
+        NativeDefine.defineBootstrapClass(cloneContainer.name, cloneContainerData);
+
+        // define runtime classes with bootstrap cl
+        DefineUtil.define(MemberAccessor.class);
+        DefineUtil.define(UnsafeUtil.class);
     }
 
     public static void register(Class<?> hookSource) {
