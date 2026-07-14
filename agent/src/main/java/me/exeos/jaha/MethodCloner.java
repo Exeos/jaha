@@ -52,8 +52,12 @@ public class MethodCloner implements Opcodes {
                 if (opcode == GETSTATIC || opcode == PUTSTATIC) {
                     replacement.add(new InsnNode(ACONST_NULL));
                     if (opcode == PUTSTATIC) {
-                        replacement.add(new InsnNode(DUP_X2));
-                        replacement.add(new InsnNode(POP));
+                        if (fieldType.getSize() == 2) {
+                            replacement.add(new InsnNode(DUP_X2));
+                            replacement.add(new InsnNode(POP));
+                        } else {
+                            replacement.add(new InsnNode(SWAP));
+                        }
                     }
                 }
                 replacement.add(new LdcInsnNode(fieldInsnNode.owner));
