@@ -1,6 +1,6 @@
 # JAHA
 
-JAHA (**JA**va **H**ooking **Agent**) is a Java library for building Java agents that hook methods at runtime while
+JAHA (**JA**va **H**ooking **A**gent) is a Java library for building Java agents that hook methods at runtime while
 preserving access to original method behavior.
 
 ## Requirements
