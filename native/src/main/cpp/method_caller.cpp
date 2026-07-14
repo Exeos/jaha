@@ -137,12 +137,10 @@ JNIEXPORT void JNI_OnUnload(JavaVM *vm, void *reserved) {
 }
 
 JNIEXPORT void JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callVoidMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     if (env->IsSameObject(ownerInstance, nullptr)) {
@@ -152,7 +150,6 @@ JNIEXPORT void JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callVoidMethod
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 }
@@ -179,12 +176,10 @@ JNIEXPORT jobject JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callObjectMe
 }
 
 JNIEXPORT jbyte JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callByteMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     jbyte result;
@@ -196,7 +191,6 @@ JNIEXPORT jbyte JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callByteMethod
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 
@@ -204,12 +198,10 @@ JNIEXPORT jbyte JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callByteMethod
 }
 
 JNIEXPORT jshort JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callShortMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     jshort result;
@@ -221,7 +213,6 @@ JNIEXPORT jshort JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callShortMeth
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 
@@ -229,12 +220,10 @@ JNIEXPORT jshort JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callShortMeth
 }
 
 JNIEXPORT jint JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callIntMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     jint result;
@@ -246,7 +235,6 @@ JNIEXPORT jint JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callIntMethod
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 
@@ -254,12 +242,10 @@ JNIEXPORT jint JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callIntMethod
 }
 
 JNIEXPORT jlong JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callLongMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     jlong result;
@@ -271,7 +257,6 @@ JNIEXPORT jlong JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callLongMethod
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 
@@ -279,12 +264,10 @@ JNIEXPORT jlong JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callLongMethod
 }
 
 JNIEXPORT jfloat JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callFloatMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     jfloat result;
@@ -296,7 +279,6 @@ JNIEXPORT jfloat JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callFloatMeth
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 
@@ -304,12 +286,10 @@ JNIEXPORT jfloat JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callFloatMeth
 }
 
 JNIEXPORT jdouble JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callDoubleMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     jdouble result;
@@ -321,7 +301,6 @@ JNIEXPORT jdouble JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callDoubleMe
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 
@@ -329,12 +308,10 @@ JNIEXPORT jdouble JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callDoubleMe
 }
 
 JNIEXPORT jboolean JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callBooleanMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     jboolean result;
@@ -347,7 +324,6 @@ JNIEXPORT jboolean JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callBoolean
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 
@@ -355,12 +331,10 @@ JNIEXPORT jboolean JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callBoolean
 }
 
 JNIEXPORT jchar JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callCharMethod
-(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jstring owner, jstring name, jstring desc) {
-    const char *ownerChars = env->GetStringUTFChars(owner, nullptr);
+(JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
 
-    jclass ownerClass = env->FindClass(ownerChars);
     std::vector<jvalue> args = unboxParams(env, argsArray, descChars);
 
     jchar result;
@@ -372,7 +346,6 @@ JNIEXPORT jchar JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callCharMethod
     }
 
     env->DeleteLocalRef(ownerClass);
-    env->ReleaseStringUTFChars(owner, ownerChars);
     env->ReleaseStringUTFChars(name, nameChars);
     env->ReleaseStringUTFChars(desc, descChars);
 

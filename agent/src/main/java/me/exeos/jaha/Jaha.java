@@ -19,9 +19,6 @@ import org.objectweb.asm.tree.VarInsnNode;
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -35,7 +32,7 @@ public class Jaha {
 
     public static void load(Instrumentation inst) {
         inst.addTransformer((loader, className, classBeingRedefined, protectionDomain, classfileBuffer) -> {
-            if (isContainerClass(className)) {
+            if (isCloneContainerClass(className)) {
                 return classfileBuffer;
             }
 
@@ -115,21 +112,10 @@ public class Jaha {
             container.accept(cloneContainerWriter);
             byte[] cloneContainerData = cloneContainerWriter.toByteArray();
 
-            Path path = Paths.get(container.name);
-            try {
-                Files.write(path, cloneContainerData);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            NativeDefine.defineBootstrapClass(container.name, cloneContainerData, targetLoader);
-            // define runtime classes with bootstrap cl
+            NativeDefine.defineClass(container.name, cloneContainerData, targetLoader);
         }
 
-        // define runtime classes with bootstrap cl
-        DefineUtil.define(NativeDefine.class, null);
-        DefineUtil.define(NativeLoader.class, null);
-        DefineUtil.define(UnsafeUtil.class, null);
-        DefineUtil.define(MemberAccessor.class, null);
+        defineRuntime();
     }
 
     public static void register(Class<?> hookSource) {
@@ -157,7 +143,17 @@ public class Jaha {
         throw new IllegalStateException("This should never be called");
     }
 
-    private static boolean isContainerClass(String className) {
+    /**
+     * Defines classes required @runtime using the bootstrap classloader
+     */
+    private static void defineRuntime() {
+        DefineUtil.define(NativeDefine.class, null); // idk why the fuck this needs to be defined?
+        DefineUtil.define(NativeLoader.class, null);
+        DefineUtil.define(UnsafeUtil.class, null);
+        DefineUtil.define(MemberAccessor.class, null);
+    }
+
+    private static boolean isCloneContainerClass(String className) {
         for (ClassNode container : methodCloner.getContainers().values()) {
             if (container.name.equals(className)) {
                 return true;

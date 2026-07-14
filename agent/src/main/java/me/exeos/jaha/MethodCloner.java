@@ -6,11 +6,7 @@ import me.exeos.jaha.util.TypeUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
-import org.objectweb.asm.util.Textifier;
-import org.objectweb.asm.util.TraceMethodVisitor;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -35,31 +31,20 @@ public class MethodCloner implements Opcodes {
         MethodNode clone = new MethodNode(
                 ACC_PUBLIC | ACC_STATIC,
                 String.valueOf(counter++),
-                methodNode.desc.replace(")", "L" + methodOwner + ";)"),
+                ASMUtil.hasAccess(methodNode.access, ACC_STATIC)
+                        ? methodNode.desc
+                        : methodNode.desc.replace(")", "L" + methodOwner + ";)"),
                 null,
                 methodNode.exceptions.toArray(new String[0])
         );
 
         clone.instructions = ASMUtil.clone(methodNode.instructions);
-
         if (!ASMUtil.hasAccess(methodNode.access, ACC_STATIC)) {
             ASMUtil.remapLocals(clone.instructions, ASMUtil.getArgumentsSize(clone.desc));
         }
         fixMemberAccess(clone);
 
-        // debug
-        Textifier textifier = new Textifier();
-        TraceMethodVisitor tmv = new TraceMethodVisitor(textifier);
-        clone.accept(tmv);
-
-        StringWriter out = new StringWriter();
-        textifier.print(new PrintWriter(out));
-        System.out.println(methodOwner + "." + methodNode.name);
-        System.out.println(out);
-        // end debug
-
         container.methods.add(clone);
-
         return clone;
     }
 
@@ -235,7 +220,6 @@ public class MethodCloner implements Opcodes {
                 }
                 replacement.add(new VarInsnNode(ALOAD, objArrSlot));
 
-//                replacement.add(new LdcInsnNode(methodInsnNode.owner));
                 replacement.add(new LdcInsnNode(Type.getObjectType(methodInsnNode.owner)));
                 replacement.add(new LdcInsnNode(methodInsnNode.name));
                 replacement.add(new LdcInsnNode(methodInsnNode.desc));

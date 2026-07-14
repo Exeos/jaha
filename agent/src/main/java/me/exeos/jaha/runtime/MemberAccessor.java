@@ -5,6 +5,12 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Provides methods bypassing access limitation to private methods
+ * This is required because we copy the original methods into new classes and pass their instance as an argument to the copied class
+ * This means the original valid call to a private method now comes from outside of that method
+ * Same applies for fields
+ */
 public class MemberAccessor {
 
     private final static Map<String, Long> offsetCache = new HashMap<>();
@@ -85,25 +91,25 @@ public class MemberAccessor {
         UnsafeUtil.theUnsafe.putObject(ownerInstance, offset(owner, name), value);
     }
 
-    public static native void callVoidMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native void callVoidMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
     public static native Object callObjectMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native byte callByteMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native byte callByteMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native short callShortMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native short callShortMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native int callIntMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native int callIntMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native long callLongMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native long callLongMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native float callFloatMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native float callFloatMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native double callDoubleMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native double callDoubleMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native boolean callBooleanMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native boolean callBooleanMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native char callCharMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native char callCharMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
     private static long offset(String owner, String name) {
         String cacheKey = owner + name;

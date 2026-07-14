@@ -8,5 +8,5 @@ public class NativeDefine {
         NativeLoader.ensureLoaded();
     }
 
-    public static native Class<?> defineBootstrapClass(String name, byte[] data, ClassLoader loader);
+    public static native Class<?> defineClass(String name, byte[] data, ClassLoader loader);
 }
