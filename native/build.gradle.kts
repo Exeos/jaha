@@ -6,9 +6,9 @@ data class NativeTarget(val target: String, val platformDir: String, val outputN
 
 val targets = listOf(
     NativeTarget("x86_64-windows-gnu", "win32", "jaha.windows-x64"),
-    NativeTarget("x86_64-linux-gnu",   "linux", "jaha.linux-x64"),
-    NativeTarget("x86_64-macos",       "darwin", "jaha.mac-x64"),
-    NativeTarget("aarch64-macos",      "darwin", "jaha.mac-aarch64")
+    NativeTarget("x86_64-linux-gnu", "linux", "jaha.linux-x64"),
+    NativeTarget("x86_64-macos", "darwin", "jaha.mac-x64"),
+    NativeTarget("aarch64-macos", "darwin", "jaha.mac-aarch64")
 )
 
 val includeDir = file("include")
@@ -31,6 +31,7 @@ val buildTasks = targets.map { t ->
             "-I${includeDir.resolve(t.platformDir).absolutePath}", // jni_md.h
             "-I${generatedHeaderDir.get().asFile.absolutePath}",
             "define_class.cpp",
+            "method_caller.cpp",
             "-o", out.resolve(t.outputName).absolutePath
         )
     }

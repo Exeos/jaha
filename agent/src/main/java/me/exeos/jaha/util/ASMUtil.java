@@ -1,5 +1,6 @@
 package me.exeos.jaha.util;
 
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
@@ -8,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public class ASMUtil {
+public class ASMUtil implements Opcodes {
 
     public static boolean hasAnnotation(MethodNode methodNode, String annotationName) {
         String annotationDesc = "L" + annotationName + ";";
@@ -87,5 +88,43 @@ public class ASMUtil {
                 }
             }
         });
+    }
+
+    public static AbstractInsnNode getIntPush(int value) {
+        if (value >= Short.MIN_VALUE && value <= Short.MAX_VALUE)
+            return getShortPush((short) value);
+
+        return new LdcInsnNode(value);
+    }
+
+    public static AbstractInsnNode getShortPush(short value) {
+        if (isIConstPush(ICONST_0 + value)) {
+            return getIConstPush(value);
+        }
+
+        if (value >= Byte.MIN_VALUE && value <= Byte.MAX_VALUE) {
+            return getBytePush((byte) value);
+        }
+
+        return new IntInsnNode(SIPUSH, value);
+    }
+
+    public static AbstractInsnNode getBytePush(byte value) {
+        if (isIConstPush(ICONST_0 + value)) {
+            return getIConstPush(value);
+        }
+
+        return new IntInsnNode(BIPUSH, value);
+    }
+
+    public static AbstractInsnNode getIConstPush(int value) {
+        if (value < -1 || value > 5)
+            throw new IllegalStateException("Value: " + value + " isn't in required bound: -1 to +5");
+
+        return new InsnNode(ICONST_0 + value);
+    }
+
+    public static boolean isIConstPush(int opcode) {
+        return opcode >= ICONST_M1 && opcode <= ICONST_5;
     }
 }

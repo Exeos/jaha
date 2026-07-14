@@ -10,6 +10,6 @@ public class SCHook {
     @Apply
     public String getKey() {
         String original = (String) Jaha.callOriginalObjectMethod();
-        return original;
+        return original + "_67";
     }
 }

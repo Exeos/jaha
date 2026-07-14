@@ -19,6 +19,9 @@ import org.objectweb.asm.tree.VarInsnNode;
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -85,7 +88,7 @@ public class Jaha {
                     }
                 }
 
-                ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                 classNode.accept(cw);
 
                 return cw.toByteArray();
@@ -108,18 +111,25 @@ public class Jaha {
             ClassLoader targetLoader = entry.getKey();
             ClassNode container = entry.getValue();
 
-            ClassWriter cloneContainerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+            ClassWriter cloneContainerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             container.accept(cloneContainerWriter);
             byte[] cloneContainerData = cloneContainerWriter.toByteArray();
 
+            Path path = Paths.get(container.name);
+            try {
+                Files.write(path, cloneContainerData);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
             NativeDefine.defineBootstrapClass(container.name, cloneContainerData, targetLoader);
+            // define runtime classes with bootstrap cl
         }
 
         // define runtime classes with bootstrap cl
-        DefineUtil.define(NativeDefine.class);
-        DefineUtil.define(NativeLoader.class);
-        DefineUtil.define(UnsafeUtil.class);
-        DefineUtil.define(MemberAccessor.class);
+        DefineUtil.define(NativeDefine.class, null);
+        DefineUtil.define(NativeLoader.class, null);
+        DefineUtil.define(UnsafeUtil.class, null);
+        DefineUtil.define(MemberAccessor.class, null);
     }
 
     public static void register(Class<?> hookSource) {

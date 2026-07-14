@@ -12,7 +12,7 @@ public class MemberAccessor {
     static {
         NativeLoader.ensureLoaded();
     }
-    
+
     public static byte getByteField(Object ownerInstance, String owner, String name) {
         return UnsafeUtil.theUnsafe.getByte(ownerInstance, offset(owner, name));
     }
@@ -87,7 +87,7 @@ public class MemberAccessor {
 
     public static native void callVoidMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native Object callObjectMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+    public static native Object callObjectMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
     public static native byte callByteMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 

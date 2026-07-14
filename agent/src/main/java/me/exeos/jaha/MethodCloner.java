@@ -2,6 +2,7 @@ package me.exeos.jaha;
 
 import me.exeos.jaha.runtime.MemberAccessor;
 import me.exeos.jaha.util.ASMUtil;
+import me.exeos.jaha.util.TypeUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -44,7 +45,7 @@ public class MethodCloner implements Opcodes {
         if (!ASMUtil.hasAccess(methodNode.access, ACC_STATIC)) {
             ASMUtil.remapLocals(clone.instructions, ASMUtil.getArgumentsSize(clone.desc));
         }
-        fixMemberAccess(clone.instructions);
+        fixMemberAccess(clone);
 
         // debug
         Textifier textifier = new Textifier();
@@ -62,8 +63,8 @@ public class MethodCloner implements Opcodes {
         return clone;
     }
 
-    private void fixMemberAccess(InsnList insns) {
-        ASMUtil.loop(insns, insnNode -> {
+    private void fixMemberAccess(MethodNode methodNode) {
+        ASMUtil.loop(methodNode.instructions, insnNode -> {
             int opcode = insnNode.getOpcode();
             if (insnNode instanceof FieldInsnNode) {
                 FieldInsnNode fieldInsnNode = (FieldInsnNode) insnNode;
@@ -135,12 +136,116 @@ public class MethodCloner implements Opcodes {
                 );
 
 
-                insns.insertBefore(insnNode, replacement);
-                insns.remove(insnNode);
+                methodNode.instructions.insertBefore(insnNode, replacement);
+                methodNode.instructions.remove(insnNode);
             }
 
             if (insnNode instanceof MethodInsnNode) {
                 MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
+                Type methodType = Type.getMethodType(methodInsnNode.desc);
+                boolean isPrimitiveReturn = TypeUtil.isPrimitive(methodType.getReturnType());
+                String methodName;
+                String methodDesc = "("
+                        + "Ljava/lang/Object;" // Object ownerInstance
+                        + "[Ljava/lang/Object;" // Object[] args
+                        + "Ljava/lang/Class;" // Class<?> owner
+                        + "Ljava/lang/String;" // String name
+                        + "Ljava/lang/String;" // String desc
+                        + ")"
+                        + (isPrimitiveReturn ? methodType.getReturnType().getDescriptor() : "Ljava/lang/Object;");
+                switch (methodType.getReturnType().getSort()) {
+                    case Type.VOID:
+                        methodName = "callVoidMethod";
+                        break;
+                    case Type.BOOLEAN:
+                        methodName = "callBooleanMethod";
+                        break;
+                    case Type.CHAR:
+                        methodName = "callCharMethod";
+                        break;
+                    case Type.BYTE:
+                        methodName = "callByteMethod";
+                        break;
+                    case Type.SHORT:
+                        methodName = "callShortMethod";
+                        break;
+                    case Type.INT:
+                        methodName = "callIntMethod";
+                        break;
+                    case Type.FLOAT:
+                        methodName = "callFloatMethod";
+                        break;
+                    case Type.LONG:
+                        methodName = "callLongMethod";
+                        break;
+                    case Type.DOUBLE:
+                        methodName = "callDoubleMethod";
+                        break;
+                    case Type.ARRAY:
+                    case Type.OBJECT:
+                        methodName = "callObjectMethod";
+                        break;
+                    default:
+                        throw new IllegalStateException("Failed to convert member access to runtime wrapper. Invalid methodType return sort: " + methodType.getReturnType().getSort());
+                }
+
+                Type[] argTypes = methodType.getArgumentTypes();
+                int[] tmpLocal = new int[argTypes.length];
+                methodNode.maxLocals++;
+                for (int i = 0; i < argTypes.length; i++) {
+                    tmpLocal[i] = methodNode.maxLocals;
+                    methodNode.maxLocals += argTypes[i].getSize();
+                }
+
+                InsnList replacement = new InsnList();
+
+                for (int i = argTypes.length - 1; i >= 0; i--) {
+                    replacement.add(new VarInsnNode(argTypes[i].getOpcode(ISTORE), tmpLocal[i]));
+                }
+
+                int objArrSlot = methodNode.maxLocals++;
+                replacement.add(ASMUtil.getIntPush(argTypes.length));
+                replacement.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
+                replacement.add(new VarInsnNode(ASTORE, objArrSlot));
+
+                for (int i = 0; i < argTypes.length; i++) {
+                    Type arguemtType = methodType.getArgumentTypes()[i];
+
+                    replacement.add(new VarInsnNode(ALOAD, objArrSlot));
+                    replacement.add(ASMUtil.getIntPush(i));
+                    replacement.add(new VarInsnNode(arguemtType.getOpcode(ILOAD), tmpLocal[i]));
+                    if (TypeUtil.isPrimitive(arguemtType)) {
+                        String primitiveClassName = TypeUtil.getPrimitiveClassName(arguemtType);
+                        replacement.add(new MethodInsnNode(
+                                INVOKESTATIC,
+                                primitiveClassName,
+                                "valueOf",
+                                "("
+                                        + arguemtType.getDescriptor()
+                                        + ")L"
+                                        + primitiveClassName
+                                        + ";"
+                        ));
+                    }
+                    replacement.add(new InsnNode(AASTORE));
+                }
+
+                if (opcode == INVOKESTATIC) {
+                    replacement.add(new InsnNode(ACONST_NULL));
+                }
+                replacement.add(new VarInsnNode(ALOAD, objArrSlot));
+
+//                replacement.add(new LdcInsnNode(methodInsnNode.owner));
+                replacement.add(new LdcInsnNode(Type.getObjectType(methodInsnNode.owner)));
+                replacement.add(new LdcInsnNode(methodInsnNode.name));
+                replacement.add(new LdcInsnNode(methodInsnNode.desc));
+                replacement.add(new MethodInsnNode(INVOKESTATIC, memberAccessorName, methodName, methodDesc));
+                if (!isPrimitiveReturn) {
+                    replacement.add(new TypeInsnNode(CHECKCAST, methodType.getReturnType().getInternalName()));
+                }
+
+                methodNode.instructions.insertBefore(insnNode, replacement);
+                methodNode.instructions.remove(insnNode);
             }
         });
     }
