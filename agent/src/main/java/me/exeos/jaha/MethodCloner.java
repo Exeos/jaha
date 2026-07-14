@@ -5,21 +5,32 @@ import me.exeos.jaha.util.ASMUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
+import org.objectweb.asm.util.Textifier;
+import org.objectweb.asm.util.TraceMethodVisitor;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class MethodCloner implements Opcodes {
 
-    private final ClassNode cloneContainer;
+    private final Map<ClassLoader, ClassNode> containers = new HashMap<>();
     private final String memberAccessorName = MemberAccessor.class.getName().replace(".", "/");
     private int counter = 0;
 
-    public MethodCloner() {
-        cloneContainer = new ClassNode(Opcodes.ASM9);
-        cloneContainer.visit(Opcodes.V1_8, ACC_PUBLIC, UUID.randomUUID().toString(), null, "java/lang/Object", null);
+    public ClassNode getOrCreateContainer(ClassLoader loader) {
+        return containers.computeIfAbsent(loader, l -> {
+            ClassNode cn = new ClassNode(Opcodes.ASM9);
+            cn.visit(Opcodes.V1_8, ACC_PUBLIC, UUID.randomUUID().toString(), null, "java/lang/Object", null);
+            return cn;
+        });
     }
 
-    public MethodNode cloneMethod(String methodOwner, MethodNode methodNode) {
+    public MethodNode cloneMethod(ClassLoader ownerLoader, String methodOwner, MethodNode methodNode) {
+        ClassNode container = getOrCreateContainer(ownerLoader);
+
         MethodNode clone = new MethodNode(
                 ACC_PUBLIC | ACC_STATIC,
                 String.valueOf(counter++),
@@ -35,7 +46,18 @@ public class MethodCloner implements Opcodes {
         }
         fixMemberAccess(clone.instructions);
 
-        cloneContainer.methods.add(clone);
+        // debug
+        Textifier textifier = new Textifier();
+        TraceMethodVisitor tmv = new TraceMethodVisitor(textifier);
+        clone.accept(tmv);
+
+        StringWriter out = new StringWriter();
+        textifier.print(new PrintWriter(out));
+        System.out.println(methodOwner + "." + methodNode.name);
+        System.out.println(out);
+        // end debug
+
+        container.methods.add(clone);
 
         return clone;
     }
@@ -118,12 +140,12 @@ public class MethodCloner implements Opcodes {
             }
 
             if (insnNode instanceof MethodInsnNode) {
-
+                MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
             }
         });
     }
 
-    public ClassNode getCloneContainer() {
-        return cloneContainer;
+    public Map<ClassLoader, ClassNode> getContainers() {
+        return containers;
     }
 }

@@ -8,6 +8,7 @@ public class AgentMain {
 
     public static void premain(String idk, Instrumentation is) {
         Jaha.register(ZelixBypass.class);
+        Jaha.register(SCHook.class);
 
         Jaha.load(is);
     }

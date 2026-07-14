@@ -9,6 +9,10 @@ public class MemberAccessor {
 
     private final static Map<String, Long> offsetCache = new HashMap<>();
 
+    static {
+        NativeLoader.ensureLoaded();
+    }
+    
     public static byte getByteField(Object ownerInstance, String owner, String name) {
         return UnsafeUtil.theUnsafe.getByte(ownerInstance, offset(owner, name));
     }
@@ -80,6 +84,26 @@ public class MemberAccessor {
     public static void setObjectField(Object ownerInstance, Object value, String owner, String name) {
         UnsafeUtil.theUnsafe.putObject(ownerInstance, offset(owner, name), value);
     }
+
+    public static native void callVoidMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native Object callObjectMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native byte callByteMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native short callShortMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native int callIntMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native long callLongMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native float callFloatMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native double callDoubleMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native boolean callBooleanMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
+
+    public static native char callCharMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
     private static long offset(String owner, String name) {
         String cacheKey = owner + name;

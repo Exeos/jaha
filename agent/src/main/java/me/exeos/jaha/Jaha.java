@@ -3,6 +3,7 @@ package me.exeos.jaha;
 import me.exeos.jaha.annotations.Apply;
 import me.exeos.jaha.annotations.Hook;
 import me.exeos.jaha.runtime.MemberAccessor;
+import me.exeos.jaha.runtime.NativeLoader;
 import me.exeos.jaha.runtime.UnsafeUtil;
 import me.exeos.jaha.util.ASMUtil;
 import me.exeos.jaha.util.DefineUtil;
@@ -30,8 +31,11 @@ public class Jaha {
     private static final MethodCloner methodCloner = new MethodCloner();
 
     public static void load(Instrumentation inst) {
-        ClassNode cloneContainer = methodCloner.getCloneContainer();
         inst.addTransformer((loader, className, classBeingRedefined, protectionDomain, classfileBuffer) -> {
+            if (isContainerClass(className)) {
+                return classfileBuffer;
+            }
+
             try {
                 ClassNode hookSource = hookSources.get(className);
                 if (hookSource == null) {
@@ -49,14 +53,15 @@ public class Jaha {
                 ClassReader cr = new ClassReader(classfileBuffer);
                 cr.accept(classNode, 0);
 
+                ClassNode container = methodCloner.getOrCreateContainer(loader);
+
                 for (MethodNode methodNode : classNode.methods.toArray(new MethodNode[0])) {
                     String methodId = methodNode.name + methodNode.desc;
                     boolean isStatic = ASMUtil.hasAccess(methodNode.access, Opcodes.ACC_STATIC);
 
                     if (hookedMethods.containsKey(methodId)) {
-
                         MethodNode hookedMethod = hookedMethods.get(methodId);
-                        MethodNode originalMethodClone = methodCloner.cloneMethod(className, methodNode);
+                        MethodNode originalMethodClone = methodCloner.cloneMethod(loader, className, methodNode);
 
                         ASMUtil.loop(hookedMethod.instructions, insnNode -> {
                             if (!(insnNode instanceof MethodInsnNode)) {
@@ -71,7 +76,7 @@ public class Jaha {
                             if (!isStatic) {
                                 hookedMethod.instructions.insertBefore(insnNode, new VarInsnNode(Opcodes.ALOAD, 0));
                             }
-                            hookedMethod.instructions.insertBefore(insnNode, new MethodInsnNode(Opcodes.INVOKESTATIC, cloneContainer.name, originalMethodClone.name, originalMethodClone.desc));
+                            hookedMethod.instructions.insertBefore(insnNode, new MethodInsnNode(Opcodes.INVOKESTATIC, container.name, originalMethodClone.name, originalMethodClone.desc));
                             hookedMethod.instructions.remove(insnNode);
                         });
 
@@ -80,7 +85,7 @@ public class Jaha {
                     }
                 }
 
-                ClassWriter cw = new ClassWriter(0);
+                ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
                 classNode.accept(cw);
 
                 return cw.toByteArray();
@@ -99,14 +104,22 @@ public class Jaha {
             }
         }
 
-        ClassWriter cloneContainerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cloneContainer.accept(cloneContainerWriter);
-        byte[] cloneContainerData = cloneContainerWriter.toByteArray();
-        NativeDefine.defineBootstrapClass(cloneContainer.name, cloneContainerData);
+        for (Map.Entry<ClassLoader, ClassNode> entry : methodCloner.getContainers().entrySet()) {
+            ClassLoader targetLoader = entry.getKey();
+            ClassNode container = entry.getValue();
+
+            ClassWriter cloneContainerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+            container.accept(cloneContainerWriter);
+            byte[] cloneContainerData = cloneContainerWriter.toByteArray();
+
+            NativeDefine.defineBootstrapClass(container.name, cloneContainerData, targetLoader);
+        }
 
         // define runtime classes with bootstrap cl
-        DefineUtil.define(MemberAccessor.class);
+        DefineUtil.define(NativeDefine.class);
+        DefineUtil.define(NativeLoader.class);
         DefineUtil.define(UnsafeUtil.class);
+        DefineUtil.define(MemberAccessor.class);
     }
 
     public static void register(Class<?> hookSource) {
@@ -132,5 +145,14 @@ public class Jaha {
 
     public static Object callOriginalObjectMethod(Object... params) {
         throw new IllegalStateException("This should never be called");
+    }
+
+    private static boolean isContainerClass(String className) {
+        for (ClassNode container : methodCloner.getContainers().values()) {
+            if (container.name.equals(className)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
