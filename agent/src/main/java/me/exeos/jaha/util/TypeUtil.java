@@ -36,7 +36,7 @@ public class TypeUtil {
         }
     }
 
-    public static String getPrimitiveClassName(Type type) {
+    public static String getPrimitiveClassInternalName(Type type) {
         if (!isPrimitive(type)) {
             throw new IllegalArgumentException("Provided Type needs to be a primitive");
         }

@@ -4,7 +4,6 @@ import me.exeos.jaha.runtime.MemberAccessor;
 import me.exeos.jaha.util.ASMUtil;
 import me.exeos.jaha.util.NativeDefine;
 import me.exeos.jaha.util.TypeUtil;
-import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -15,59 +14,61 @@ import java.util.UUID;
 
 public class MethodCloner implements Opcodes {
 
+    /**
+     * Classes containing cloned methods, grouped by the {@link ClassLoader} of the original method.
+     */
     private final Map<ClassLoader, ClassNode> containers = new HashMap<>();
-    private final String memberAccessorName = MemberAccessor.class.getName().replace(".", "/");
-    private int counter = 0;
 
-    private ClassNode getOrCreateContainer(ClassLoader loader) {
-        return containers.computeIfAbsent(loader, l -> {
-            ClassNode cn = new ClassNode(Opcodes.ASM9);
-            cn.visit(Opcodes.V1_8, ACC_PUBLIC, UUID.randomUUID().toString(), null, "java/lang/Object", null);
-            return cn;
-        });
-    }
+    /**
+     * Counter used for unique cloned method names.
+     */
+    private int clonedMethodCount = 0;
 
-    public void cloneMethod(ClassLoader ownerLoader, String methodOwner, MethodNode methodNode, MethodNode other) {
+    public void cloneMethod(ClassLoader ownerLoader, String methodOwner, MethodNode originalMethod, MethodNode hookedMethod) {
+        boolean isStatic = ASMUtil.hasAccess(originalMethod.access, ACC_STATIC);
         ClassNode container = getOrCreateContainer(ownerLoader);
-
         MethodNode clone = new MethodNode(
                 ACC_PUBLIC | ACC_STATIC,
-                String.valueOf(counter++),
-                ASMUtil.hasAccess(methodNode.access, ACC_STATIC)
-                        ? methodNode.desc
-                        : methodNode.desc.replace(")", "L" + methodOwner + ";)"),
+                String.valueOf(clonedMethodCount++),
+                ASMUtil.hasAccess(originalMethod.access, ACC_STATIC)
+                        ? originalMethod.desc
+                        : originalMethod.desc.replace(")", "L" + methodOwner + ";)"),
                 null,
-                methodNode.exceptions.toArray(new String[0])
+                originalMethod.exceptions.toArray(new String[0])
         );
+        clone.instructions = ASMUtil.clone(originalMethod.instructions);
 
-        clone.instructions = ASMUtil.clone(methodNode.instructions);
-        if (!ASMUtil.hasAccess(methodNode.access, ACC_STATIC)) {
+        if (!isStatic) {
+            // locals need to be remapped, because we added a parameter
             ASMUtil.remapLocals(clone.instructions, ASMUtil.getArgumentsSize(clone.desc));
         }
         fixMemberAccess(clone);
-
-        ASMUtil.loop(other.instructions, insnNode -> {
-            if (!(insnNode instanceof MethodInsnNode)) {
-                return;
-            }
-
-            MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
-            if (!methodInsnNode.owner.equals(ASMUtil.getInternalName(Jaha.class)) || !methodInsnNode.name.startsWith("callOriginal")) {
-                return;
-            }
-
-            if (!ASMUtil.hasAccess(methodNode.access, Opcodes.ACC_STATIC)) {
-                other.instructions.insertBefore(insnNode, new VarInsnNode(Opcodes.ALOAD, 0));
-            }
-            other.instructions.insertBefore(insnNode, new MethodInsnNode(Opcodes.INVOKESTATIC, container.name, clone.name, clone.desc));
-            other.instructions.remove(insnNode);
-        });
+        replaceCallsToDummyOriginal(container, hookedMethod, clone, isStatic);
 
         container.methods.add(clone);
     }
 
-    private void fixMemberAccess(MethodNode methodNode) {
-        ASMUtil.loop(methodNode.instructions, insnNode -> {
+    /**
+     * Defines all generated container classes using their associated {@link ClassLoader}.
+     */
+    public void defineContainerClasses() {
+        for (Map.Entry<ClassLoader, ClassNode> entry : containers.entrySet()) {
+            NativeDefine.defineClassNode(
+                    entry.getValue(), // container class
+                    entry.getKey()    // original method's ClassLoader
+            );
+        }
+    }
+
+    /**
+     * Rewrites member access instructions inside cloned methods.
+     * This is done to avoid calling private members,
+     * which would break because cloned methods live in a different class than original.
+     *
+     * @param clonedMethod Method to rewrite
+     */
+    private void fixMemberAccess(MethodNode clonedMethod) {
+        ASMUtil.loop(clonedMethod.instructions, insnNode -> {
             int opcode = insnNode.getOpcode();
             if (insnNode instanceof FieldInsnNode) {
                 FieldInsnNode fieldInsnNode = (FieldInsnNode) insnNode;
@@ -133,14 +134,14 @@ public class MethodCloner implements Opcodes {
 
                 replacement.add(new MethodInsnNode(
                         INVOKESTATIC,
-                        memberAccessorName,
+                        ASMUtil.getInternalName(MemberAccessor.class),
                         methodName,
                         methodDesc)
                 );
 
 
-                methodNode.instructions.insertBefore(insnNode, replacement);
-                methodNode.instructions.remove(insnNode);
+                clonedMethod.instructions.insertBefore(insnNode, replacement);
+                clonedMethod.instructions.remove(insnNode);
             }
 
             if (insnNode instanceof MethodInsnNode) {
@@ -194,10 +195,10 @@ public class MethodCloner implements Opcodes {
 
                 Type[] argTypes = methodType.getArgumentTypes();
                 int[] tmpLocal = new int[argTypes.length];
-                methodNode.maxLocals++;
+                clonedMethod.maxLocals++;
                 for (int i = 0; i < argTypes.length; i++) {
-                    tmpLocal[i] = methodNode.maxLocals;
-                    methodNode.maxLocals += argTypes[i].getSize();
+                    tmpLocal[i] = clonedMethod.maxLocals;
+                    clonedMethod.maxLocals += argTypes[i].getSize();
                 }
 
                 InsnList replacement = new InsnList();
@@ -206,7 +207,7 @@ public class MethodCloner implements Opcodes {
                     replacement.add(new VarInsnNode(argTypes[i].getOpcode(ISTORE), tmpLocal[i]));
                 }
 
-                int objArrSlot = methodNode.maxLocals++;
+                int objArrSlot = clonedMethod.maxLocals++;
                 replacement.add(ASMUtil.getIntPush(argTypes.length));
                 replacement.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
                 replacement.add(new VarInsnNode(ASTORE, objArrSlot));
@@ -218,7 +219,7 @@ public class MethodCloner implements Opcodes {
                     replacement.add(ASMUtil.getIntPush(i));
                     replacement.add(new VarInsnNode(arguemtType.getOpcode(ILOAD), tmpLocal[i]));
                     if (TypeUtil.isPrimitive(arguemtType)) {
-                        String primitiveClassName = TypeUtil.getPrimitiveClassName(arguemtType);
+                        String primitiveClassName = TypeUtil.getPrimitiveClassInternalName(arguemtType);
                         replacement.add(new MethodInsnNode(
                                 INVOKESTATIC,
                                 primitiveClassName,
@@ -241,36 +242,55 @@ public class MethodCloner implements Opcodes {
                 replacement.add(new LdcInsnNode(Type.getObjectType(methodInsnNode.owner)));
                 replacement.add(new LdcInsnNode(methodInsnNode.name));
                 replacement.add(new LdcInsnNode(methodInsnNode.desc));
-                replacement.add(new MethodInsnNode(INVOKESTATIC, memberAccessorName, methodName, methodDesc));
+                replacement.add(new MethodInsnNode(INVOKESTATIC, ASMUtil.getInternalName(MemberAccessor.class), methodName, methodDesc));
                 if (!isPrimitiveReturn) {
                     replacement.add(new TypeInsnNode(CHECKCAST, methodType.getReturnType().getInternalName()));
                 }
 
-                methodNode.instructions.insertBefore(insnNode, replacement);
-                methodNode.instructions.remove(insnNode);
+                clonedMethod.instructions.insertBefore(insnNode, replacement);
+                clonedMethod.instructions.remove(insnNode);
             }
         });
     }
 
-    public void defineContainerClasses() {
-        for (Map.Entry<ClassLoader, ClassNode> entry : containers.entrySet()) {
-            ClassLoader targetLoader = entry.getKey();
-            ClassNode container = entry.getValue();
+    /**
+     * Replaces Jaha.callOriginal* placeholder in the hooked method with calls to the cloned original method.
+     *
+     * @param container    Class containing the cloned method
+     * @param hookedMethod Method being rewritten
+     * @param clone        Generated clone that should be called instead
+     */
+    private void replaceCallsToDummyOriginal(ClassNode container, MethodNode hookedMethod, MethodNode clone, boolean isStatic) {
+        ASMUtil.loop(hookedMethod.instructions, insnNode -> {
+            if (!(insnNode instanceof MethodInsnNode)) {
+                return;
+            }
 
-            ClassWriter cloneContainerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-            container.accept(cloneContainerWriter);
-            byte[] cloneContainerData = cloneContainerWriter.toByteArray();
+            MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
+            if (!methodInsnNode.owner.equals(ASMUtil.getInternalName(Jaha.class)) || !methodInsnNode.name.startsWith("callOriginal")) {
+                return;
+            }
 
-            NativeDefine.defineClass(container.name, cloneContainerData, targetLoader);
-        }
+            if (!isStatic) {
+                hookedMethod.instructions.insertBefore(insnNode, new VarInsnNode(Opcodes.ALOAD, 0));
+            }
+            hookedMethod.instructions.insertBefore(insnNode, new MethodInsnNode(Opcodes.INVOKESTATIC, container.name, clone.name, clone.desc));
+            hookedMethod.instructions.remove(insnNode);
+        });
     }
 
-    public boolean isCloneContainerClass(String className) {
-        for (ClassNode container : containers.values()) {
-            if (container.name.equals(className)) {
-                return true;
-            }
-        }
-        return false;
+    /**
+     * Returns the container associated with the given {@link ClassLoader},
+     * creating and registering one if it does not exist.
+     *
+     * @param loader the target class loader that will own/define the container class
+     * @return container class bound to {@code loader}
+     */
+    private ClassNode getOrCreateContainer(ClassLoader loader) {
+        return containers.computeIfAbsent(loader, l -> {
+            ClassNode containerClass = new ClassNode(Opcodes.ASM9);
+            containerClass.visit(Opcodes.V1_8, ACC_PUBLIC, UUID.randomUUID().toString(), null, "java/lang/Object", null);
+            return containerClass;
+        });
     }
 }

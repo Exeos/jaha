@@ -4,9 +4,8 @@ import me.exeos.jaha.annotations.Apply;
 import me.exeos.jaha.annotations.Hook;
 import me.exeos.jaha.runtime.MemberAccessor;
 import me.exeos.jaha.runtime.NativeLoader;
-import me.exeos.jaha.runtime.UnsafeUtil;
+import me.exeos.jaha.runtime.UnsafeAccess;
 import me.exeos.jaha.util.ASMUtil;
-import me.exeos.jaha.util.DefineUtil;
 import me.exeos.jaha.util.NativeDefine;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -24,10 +23,6 @@ public class Jaha {
 
     public static void applyHooks(Instrumentation inst) {
         inst.addTransformer((loader, className, classBeingRedefined, protectionDomain, classfileBuffer) -> {
-            if (methodCloner.isCloneContainerClass(className)) {
-                return classfileBuffer;
-            }
-
             ClassNode hookSource = hookSources.get(className);
             if (hookSource == null) {
                 return classfileBuffer;
@@ -89,16 +84,15 @@ public class Jaha {
      */
     private static void defineRuntimeClasses() {
         methodCloner.defineContainerClasses();
-        DefineUtil.define(NativeDefine.class, null); // idk why the fuck this needs to be defined?
-        DefineUtil.define(NativeLoader.class, null);
-        DefineUtil.define(UnsafeUtil.class, null);
-        DefineUtil.define(MemberAccessor.class, null);
+        NativeDefine.defineClass(NativeLoader.class, null);
+        NativeDefine.defineClass(UnsafeAccess.class, null);
+        NativeDefine.defineClass(MemberAccessor.class, null);
     }
 
     private static Map<String, MethodNode> getMethodHookSources(ClassNode hookSource) {
         Map<String, MethodNode> hookedMethods = new HashMap<>();
         for (MethodNode methodNode : hookSource.methods) {
-            if (ASMUtil.hasAnnotation(methodNode, Apply.class.getName().replace(".", "/"))) {
+            if (ASMUtil.hasAnnotation(methodNode, ASMUtil.getInternalName(Apply.class))) {
                 hookedMethods.put(methodNode.name + methodNode.desc, methodNode);
             }
         }

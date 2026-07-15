@@ -16,6 +16,13 @@ public class ASMUtil implements Opcodes {
 
     public static final int ASM_VERSION = Opcodes.ASM9;
 
+    /**
+     * Check if methodNode has visible or invisible annotation
+     *
+     * @param methodNode     MethodNode to check
+     * @param annotationName Internal name of the annotation
+     * @return true if it has, else false
+     */
     public static boolean hasAnnotation(MethodNode methodNode, String annotationName) {
         String annotationDesc = "L" + annotationName + ";";
         return hasAnnotation(methodNode.visibleAnnotations, annotationDesc) || hasAnnotation(methodNode.invisibleAnnotations, annotationDesc);
@@ -31,6 +38,12 @@ public class ASMUtil implements Opcodes {
         return false;
     }
 
+    /**
+     * Safely loop trough InsnList, without causing brakeage when modifying InsnList
+     *
+     * @param insnList InsnList to loop trough
+     * @param visitor  Consumer to be consumed on each instruction
+     */
     public static void loop(InsnList insnList, Consumer<AbstractInsnNode> visitor) {
         AbstractInsnNode current = insnList.getFirst();
 
@@ -41,10 +54,23 @@ public class ASMUtil implements Opcodes {
         }
     }
 
+    /**
+     * Checks if access code bitmask contains toCheck
+     *
+     * @param access  Access code bitmask
+     * @param toCheck Access code to check
+     * @return true if access has toCheck, else false
+     */
     public static boolean hasAccess(int access, int toCheck) {
         return (access & toCheck) != 0;
     }
 
+    /**
+     * Clone InsnList, so you keep the instructions without causing breakage to related Objects
+     *
+     * @param source InsnList to clone
+     * @return Cloned InsnList
+     */
     public static InsnList clone(InsnList source) {
         Map<LabelNode, LabelNode> labelMap = new HashMap<>();
         for (AbstractInsnNode insn : source.toArray()) {
@@ -158,6 +184,17 @@ public class ASMUtil implements Opcodes {
         classNode.accept(cw);
 
         return cw.toByteArray();
+    }
+
+    public static byte[] getClassBytes(Class<?> clazz) {
+        ClassReader cr;
+        try {
+            cr = new ClassReader(clazz.getName());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read class: " + clazz.getName(), e);
+        }
+
+        return cr.b;
     }
 
     public static String getInternalName(Class<?> clazz) {

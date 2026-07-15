@@ -6,10 +6,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Provides methods bypassing access limitation to private methods
- * This is required because we copy the original methods into new classes and pass their instance as an argument to the copied class
- * This means the original valid call to a private method now comes from outside of that method
- * Same applies for fields
+ * Provides methods for bypassing access limitation.
+ * This is required because we copy the original, unhooked methods into new classes.
+ * This means access to private members now come from another class.
  */
 public class MemberAccessor {
 
@@ -20,75 +19,75 @@ public class MemberAccessor {
     }
 
     public static byte getByteField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getByte(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getByte(ownerInstance, offset(owner, name));
     }
 
     public static short getShortField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getShort(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getShort(ownerInstance, offset(owner, name));
     }
 
     public static int getIntField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getInt(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getInt(ownerInstance, offset(owner, name));
     }
 
     public static long getLongField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getLong(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getLong(ownerInstance, offset(owner, name));
     }
 
     public static float getFloatField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getFloat(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getFloat(ownerInstance, offset(owner, name));
     }
 
     public static double getDoubleField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getDouble(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getDouble(ownerInstance, offset(owner, name));
     }
 
     public static boolean getBooleanField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getBoolean(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getBoolean(ownerInstance, offset(owner, name));
     }
 
     public static char getCharField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getChar(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getChar(ownerInstance, offset(owner, name));
     }
 
     public static Object getObjectField(Object ownerInstance, String owner, String name) {
-        return UnsafeUtil.theUnsafe.getObject(ownerInstance, offset(owner, name));
+        return UnsafeAccess.theUnsafe.getObject(ownerInstance, offset(owner, name));
     }
 
     public static void setByteField(Object ownerInstance, byte value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putByte(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putByte(ownerInstance, offset(owner, name), value);
     }
 
     public static void setShortField(Object ownerInstance, short value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putShort(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putShort(ownerInstance, offset(owner, name), value);
     }
 
     public static void setIntField(Object ownerInstance, int value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putInt(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putInt(ownerInstance, offset(owner, name), value);
     }
 
     public static void setLongField(Object ownerInstance, long value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putLong(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putLong(ownerInstance, offset(owner, name), value);
     }
 
     public static void setFloatField(Object ownerInstance, float value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putFloat(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putFloat(ownerInstance, offset(owner, name), value);
     }
 
     public static void setDoubleField(Object ownerInstance, double value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putDouble(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putDouble(ownerInstance, offset(owner, name), value);
     }
 
     public static void setBooleanField(Object ownerInstance, boolean value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putBoolean(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putBoolean(ownerInstance, offset(owner, name), value);
     }
 
     public static void setCharField(Object ownerInstance, char value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putChar(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putChar(ownerInstance, offset(owner, name), value);
     }
 
     public static void setObjectField(Object ownerInstance, Object value, String owner, String name) {
-        UnsafeUtil.theUnsafe.putObject(ownerInstance, offset(owner, name), value);
+        UnsafeAccess.theUnsafe.putObject(ownerInstance, offset(owner, name), value);
     }
 
     public static native void callVoidMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
@@ -119,8 +118,8 @@ public class MemberAccessor {
 
         Field f = getField(owner, name);
         long offset = Modifier.isStatic(f.getModifiers())
-                ? UnsafeUtil.theUnsafe.staticFieldOffset(f)
-                : UnsafeUtil.theUnsafe.objectFieldOffset(f);
+                ? UnsafeAccess.theUnsafe.staticFieldOffset(f)
+                : UnsafeAccess.theUnsafe.objectFieldOffset(f);
 
         offsetCache.put(cacheKey, offset);
         return offset;

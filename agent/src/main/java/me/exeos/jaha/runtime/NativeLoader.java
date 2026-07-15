@@ -1,7 +1,5 @@
 package me.exeos.jaha.runtime;
 
-import me.exeos.jaha.util.NativeDefine;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,7 +15,7 @@ public class NativeLoader {
         if (!loaded) {
             String libName = getLibName();
 
-            try (InputStream in = NativeDefine.class.getResourceAsStream("/" + libName)) {
+            try (InputStream in = NativeLoader.class.getResourceAsStream("/" + libName)) {
                 if (in == null) {
                     throw new FileNotFoundException(libName + " not found in resources. Platform might not be supported.");
                 }
