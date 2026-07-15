@@ -7,17 +7,20 @@ import java.util.Map;
 
 public class TypeUtil {
 
-    private static final Map<Type, String> PRIMITIVE_TO_CLASS = new HashMap<>();
+    private static final Map<Integer, Class<?>> TYPE_TO_CLASS = new HashMap<>();
 
     static {
-        PRIMITIVE_TO_CLASS.put(Type.BYTE_TYPE, "java/lang/Byte");
-        PRIMITIVE_TO_CLASS.put(Type.SHORT_TYPE, "java/lang/Short");
-        PRIMITIVE_TO_CLASS.put(Type.INT_TYPE, "java/lang/Integer");
-        PRIMITIVE_TO_CLASS.put(Type.LONG_TYPE, "java/lang/Long");
-        PRIMITIVE_TO_CLASS.put(Type.FLOAT_TYPE, "java/lang/Float");
-        PRIMITIVE_TO_CLASS.put(Type.DOUBLE_TYPE, "java/lang/Double");
-        PRIMITIVE_TO_CLASS.put(Type.BOOLEAN_TYPE, "java/lang/Boolean");
-        PRIMITIVE_TO_CLASS.put(Type.CHAR_TYPE, "java/lang/Character");
+        TYPE_TO_CLASS.put(Type.VOID, Void.class);
+        TYPE_TO_CLASS.put(Type.BYTE, Byte.class);
+        TYPE_TO_CLASS.put(Type.SHORT, Short.class);
+        TYPE_TO_CLASS.put(Type.INT, Integer.class);
+        TYPE_TO_CLASS.put(Type.LONG, Long.class);
+        TYPE_TO_CLASS.put(Type.FLOAT, Float.class);
+        TYPE_TO_CLASS.put(Type.DOUBLE, Double.class);
+        TYPE_TO_CLASS.put(Type.BOOLEAN, Boolean.class);
+        TYPE_TO_CLASS.put(Type.CHAR, Character.class);
+        TYPE_TO_CLASS.put(Type.ARRAY, Object.class);
+        TYPE_TO_CLASS.put(Type.OBJECT, Object.class);
     }
 
     public static boolean isPrimitive(Type type) {
@@ -36,10 +39,19 @@ public class TypeUtil {
         }
     }
 
-    public static String getPrimitiveClassInternalName(Type type) {
-        if (!isPrimitive(type)) {
-            throw new IllegalArgumentException("Provided Type needs to be a primitive");
+    public static String getTypeClassInternalName(Type type) {
+        if (!TYPE_TO_CLASS.containsKey(type.getSort())) {
+            throw new IllegalArgumentException("Provided Type isn't mapped");
         }
-        return PRIMITIVE_TO_CLASS.get(type);
+
+        return ASMUtil.getInternalName(TYPE_TO_CLASS.get(type.getSort()));
+    }
+
+    public static String getTypeName(Type type) {
+        if (!TYPE_TO_CLASS.containsKey(type.getSort())) {
+            throw new IllegalArgumentException("Provided Type isn't mapped");
+        }
+
+        return TYPE_TO_CLASS.get(type.getSort()).getSimpleName();
     }
 }

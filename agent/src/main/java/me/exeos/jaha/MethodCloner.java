@@ -75,7 +75,17 @@ public class MethodCloner implements Opcodes {
                 Type fieldType = Type.getType(fieldInsnNode.desc);
                 boolean isGet = opcode == GETSTATIC || opcode == GETFIELD;
 
+                String methodName = (isGet ? "get" : "set") + TypeUtil.getTypeName(fieldType) + "Field";
+                String methodDesc = "("
+                        + "Ljava/lang/Object;" // Object ownerInstance
+                        + (!isGet ? fieldType.getDescriptor() : "") // For set?Field: ? value
+                        + "Ljava/lang/String;" // String owner
+                        + "Ljava/lang/String;" // String name
+                        + ")"
+                        + (isGet ? fieldType.getDescriptor() : "V");
+
                 InsnList replacement = new InsnList();
+                // push null onto stack if access is static. Swap stack if type is PUT because null needs to be below value, that is already on stack
                 if (opcode == GETSTATIC || opcode == PUTSTATIC) {
                     replacement.add(new InsnNode(ACONST_NULL));
                     if (opcode == PUTSTATIC) {
@@ -87,51 +97,9 @@ public class MethodCloner implements Opcodes {
                         }
                     }
                 }
+
                 replacement.add(new LdcInsnNode(fieldInsnNode.owner));
                 replacement.add(new LdcInsnNode(fieldInsnNode.name));
-
-                String methodName;
-
-                switch (fieldType.getSort()) {
-                    case Type.BYTE:
-                        methodName = isGet ? "getByteField" : "setByteField";
-                        break;
-                    case Type.SHORT:
-                        methodName = isGet ? "getShortField" : "setShortField";
-                        break;
-                    case Type.INT:
-                        methodName = isGet ? "getIntField" : "setIntField";
-                        break;
-                    case Type.LONG:
-                        methodName = isGet ? "getLongField" : "setLongField";
-                        break;
-                    case Type.FLOAT:
-                        methodName = isGet ? "getFloatField" : "setFloatField";
-                        break;
-                    case Type.DOUBLE:
-                        methodName = isGet ? "getDoubleField" : "setDoubleField";
-                        break;
-                    case Type.BOOLEAN:
-                        methodName = isGet ? "getBooleanField" : "setBooleanField";
-                        break;
-                    case Type.CHAR:
-                        methodName = isGet ? "getCharField" : "setCharField";
-                        break;
-                    case Type.OBJECT:
-                        methodName = isGet ? "getObjectField" : "setObjectField";
-                        break;
-                    default:
-                        throw new IllegalStateException("Failed to convert member access to runtime wrapper. Invalid fieldType: " + fieldType.getSort());
-                }
-
-                String methodDesc = "("
-                        + "Ljava/lang/Object;"
-                        + (!isGet ? fieldType.getDescriptor() : "")
-                        + "Ljava/lang/String;Ljava/lang/String;"
-                        + ")"
-                        + (isGet ? fieldType.getDescriptor() : "V");
-
-
                 replacement.add(new MethodInsnNode(
                         INVOKESTATIC,
                         ASMUtil.getInternalName(MemberAccessor.class),
@@ -147,8 +115,10 @@ public class MethodCloner implements Opcodes {
             if (insnNode instanceof MethodInsnNode) {
                 MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
                 Type methodType = Type.getMethodType(methodInsnNode.desc);
-                boolean isPrimitiveReturn = TypeUtil.isPrimitive(methodType.getReturnType());
-                String methodName;
+                Type methodReturnType = methodType.getReturnType();
+                boolean returnsPrimitive = TypeUtil.isPrimitive(methodReturnType);
+
+                String methodName = "call" + TypeUtil.getTypeName(methodReturnType) + "Method";
                 String methodDesc = "("
                         + "Ljava/lang/Object;" // Object ownerInstance
                         + "[Ljava/lang/Object;" // Object[] args
@@ -156,70 +126,36 @@ public class MethodCloner implements Opcodes {
                         + "Ljava/lang/String;" // String name
                         + "Ljava/lang/String;" // String desc
                         + ")"
-                        + (isPrimitiveReturn ? methodType.getReturnType().getDescriptor() : "Ljava/lang/Object;");
-                switch (methodType.getReturnType().getSort()) {
-                    case Type.VOID:
-                        methodName = "callVoidMethod";
-                        break;
-                    case Type.BOOLEAN:
-                        methodName = "callBooleanMethod";
-                        break;
-                    case Type.CHAR:
-                        methodName = "callCharMethod";
-                        break;
-                    case Type.BYTE:
-                        methodName = "callByteMethod";
-                        break;
-                    case Type.SHORT:
-                        methodName = "callShortMethod";
-                        break;
-                    case Type.INT:
-                        methodName = "callIntMethod";
-                        break;
-                    case Type.FLOAT:
-                        methodName = "callFloatMethod";
-                        break;
-                    case Type.LONG:
-                        methodName = "callLongMethod";
-                        break;
-                    case Type.DOUBLE:
-                        methodName = "callDoubleMethod";
-                        break;
-                    case Type.ARRAY:
-                    case Type.OBJECT:
-                        methodName = "callObjectMethod";
-                        break;
-                    default:
-                        throw new IllegalStateException("Failed to convert member access to runtime wrapper. Invalid methodType return sort: " + methodType.getReturnType().getSort());
-                }
+                        + (returnsPrimitive ? methodReturnType.getDescriptor() : "Ljava/lang/Object;");
 
                 Type[] argTypes = methodType.getArgumentTypes();
-                int[] tmpLocal = new int[argTypes.length];
+                int[] paramLocals = new int[argTypes.length];
                 clonedMethod.maxLocals++;
                 for (int i = 0; i < argTypes.length; i++) {
-                    tmpLocal[i] = clonedMethod.maxLocals;
+                    paramLocals[i] = clonedMethod.maxLocals;
                     clonedMethod.maxLocals += argTypes[i].getSize();
                 }
 
                 InsnList replacement = new InsnList();
 
+                // store arguments, that are currently on the stack into locals to avoid hacky stack manipulation
                 for (int i = argTypes.length - 1; i >= 0; i--) {
-                    replacement.add(new VarInsnNode(argTypes[i].getOpcode(ISTORE), tmpLocal[i]));
+                    replacement.add(new VarInsnNode(argTypes[i].getOpcode(ISTORE), paramLocals[i]));
                 }
 
+                // put arguments stored in locals into Object[]
                 int objArrSlot = clonedMethod.maxLocals++;
                 replacement.add(ASMUtil.getIntPush(argTypes.length));
                 replacement.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
                 replacement.add(new VarInsnNode(ASTORE, objArrSlot));
-
                 for (int i = 0; i < argTypes.length; i++) {
                     Type arguemtType = methodType.getArgumentTypes()[i];
 
                     replacement.add(new VarInsnNode(ALOAD, objArrSlot));
                     replacement.add(ASMUtil.getIntPush(i));
-                    replacement.add(new VarInsnNode(arguemtType.getOpcode(ILOAD), tmpLocal[i]));
+                    replacement.add(new VarInsnNode(arguemtType.getOpcode(ILOAD), paramLocals[i]));
                     if (TypeUtil.isPrimitive(arguemtType)) {
-                        String primitiveClassName = TypeUtil.getPrimitiveClassInternalName(arguemtType);
+                        String primitiveClassName = TypeUtil.getTypeClassInternalName(arguemtType);
                         replacement.add(new MethodInsnNode(
                                 INVOKESTATIC,
                                 primitiveClassName,
@@ -237,13 +173,16 @@ public class MethodCloner implements Opcodes {
                 if (opcode == INVOKESTATIC) {
                     replacement.add(new InsnNode(ACONST_NULL));
                 }
+                // stack: null if static call, instance object if virtual
+
+                // push argument Object[]
                 replacement.add(new VarInsnNode(ALOAD, objArrSlot));
 
                 replacement.add(new LdcInsnNode(Type.getObjectType(methodInsnNode.owner)));
                 replacement.add(new LdcInsnNode(methodInsnNode.name));
                 replacement.add(new LdcInsnNode(methodInsnNode.desc));
                 replacement.add(new MethodInsnNode(INVOKESTATIC, ASMUtil.getInternalName(MemberAccessor.class), methodName, methodDesc));
-                if (!isPrimitiveReturn) {
+                if (!returnsPrimitive) {
                     replacement.add(new TypeInsnNode(CHECKCAST, methodType.getReturnType().getInternalName()));
                 }
 
