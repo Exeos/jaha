@@ -1,15 +1,20 @@
 package me.exeos.jaha.util;
 
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
 public class ASMUtil implements Opcodes {
+
+    public static final int ASM_VERSION = Opcodes.ASM9;
 
     public static boolean hasAnnotation(MethodNode methodNode, String annotationName) {
         String annotationDesc = "L" + annotationName + ";";
@@ -126,5 +131,36 @@ public class ASMUtil implements Opcodes {
 
     public static boolean isIConstPush(int opcode) {
         return opcode >= ICONST_M1 && opcode <= ICONST_5;
+    }
+
+    public static ClassNode cnFromBytes(byte[] data) {
+        ClassNode classNode = new ClassNode(ASM_VERSION);
+        ClassReader cr = new ClassReader(data);
+        cr.accept(classNode, 0);
+
+        return classNode;
+    }
+
+    public static ClassNode cnFromClass(Class<?> clazz) {
+        ClassNode classNode = new ClassNode(ASM_VERSION);
+        try {
+            ClassReader cr = new ClassReader(clazz.getName());
+            cr.accept(classNode, ClassReader.SKIP_DEBUG);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to parse ClassNode from Class: " + clazz.getName(), e);
+        }
+
+        return classNode;
+    }
+
+    public static byte[] getCNBytes(ClassNode classNode) {
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        classNode.accept(cw);
+
+        return cw.toByteArray();
+    }
+
+    public static String getInternalName(Class<?> clazz) {
+        return clazz.getName().replace(".", "/");
     }
 }

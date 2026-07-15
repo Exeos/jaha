@@ -2,7 +2,9 @@ package me.exeos.jaha;
 
 import me.exeos.jaha.runtime.MemberAccessor;
 import me.exeos.jaha.util.ASMUtil;
+import me.exeos.jaha.util.NativeDefine;
 import me.exeos.jaha.util.TypeUtil;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -17,7 +19,7 @@ public class MethodCloner implements Opcodes {
     private final String memberAccessorName = MemberAccessor.class.getName().replace(".", "/");
     private int counter = 0;
 
-    public ClassNode getOrCreateContainer(ClassLoader loader) {
+    private ClassNode getOrCreateContainer(ClassLoader loader) {
         return containers.computeIfAbsent(loader, l -> {
             ClassNode cn = new ClassNode(Opcodes.ASM9);
             cn.visit(Opcodes.V1_8, ACC_PUBLIC, UUID.randomUUID().toString(), null, "java/lang/Object", null);
@@ -25,7 +27,7 @@ public class MethodCloner implements Opcodes {
         });
     }
 
-    public MethodNode cloneMethod(ClassLoader ownerLoader, String methodOwner, MethodNode methodNode) {
+    public void cloneMethod(ClassLoader ownerLoader, String methodOwner, MethodNode methodNode, MethodNode other) {
         ClassNode container = getOrCreateContainer(ownerLoader);
 
         MethodNode clone = new MethodNode(
@@ -44,8 +46,24 @@ public class MethodCloner implements Opcodes {
         }
         fixMemberAccess(clone);
 
+        ASMUtil.loop(other.instructions, insnNode -> {
+            if (!(insnNode instanceof MethodInsnNode)) {
+                return;
+            }
+
+            MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
+            if (!methodInsnNode.owner.equals(ASMUtil.getInternalName(Jaha.class)) || !methodInsnNode.name.startsWith("callOriginal")) {
+                return;
+            }
+
+            if (!ASMUtil.hasAccess(methodNode.access, Opcodes.ACC_STATIC)) {
+                other.instructions.insertBefore(insnNode, new VarInsnNode(Opcodes.ALOAD, 0));
+            }
+            other.instructions.insertBefore(insnNode, new MethodInsnNode(Opcodes.INVOKESTATIC, container.name, clone.name, clone.desc));
+            other.instructions.remove(insnNode);
+        });
+
         container.methods.add(clone);
-        return clone;
     }
 
     private void fixMemberAccess(MethodNode methodNode) {
@@ -234,7 +252,25 @@ public class MethodCloner implements Opcodes {
         });
     }
 
-    public Map<ClassLoader, ClassNode> getContainers() {
-        return containers;
+    public void defineContainerClasses() {
+        for (Map.Entry<ClassLoader, ClassNode> entry : containers.entrySet()) {
+            ClassLoader targetLoader = entry.getKey();
+            ClassNode container = entry.getValue();
+
+            ClassWriter cloneContainerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            container.accept(cloneContainerWriter);
+            byte[] cloneContainerData = cloneContainerWriter.toByteArray();
+
+            NativeDefine.defineClass(container.name, cloneContainerData, targetLoader);
+        }
+    }
+
+    public boolean isCloneContainerClass(String className) {
+        for (ClassNode container : containers.values()) {
+            if (container.name.equals(className)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
