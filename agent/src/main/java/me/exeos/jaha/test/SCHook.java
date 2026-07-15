@@ -8,8 +8,9 @@ import me.exeos.jaha.annotations.Hook;
 public class SCHook {
 
     @Apply
-    public String getKey() {
-        String original = (String) Jaha.callOriginalObjectMethod();
-        return original + "_67";
+    public String deriveKey(int n) {
+        int original = Jaha.callOriginalIntMethod(n);
+
+        return String.valueOf(original + 2);
     }
 }

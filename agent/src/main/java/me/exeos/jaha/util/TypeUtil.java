@@ -33,6 +33,7 @@ public class TypeUtil {
             case Type.DOUBLE:
             case Type.BOOLEAN:
             case Type.CHAR:
+            case Type.VOID:
                 return true;
             default:
                 return false;

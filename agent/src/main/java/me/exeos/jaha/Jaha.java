@@ -75,8 +75,48 @@ public class Jaha {
         hookSources.put(targetClassName, ASMUtil.cnFromClass(hookSource));
     }
 
+    public static void callOriginalVoidMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
     public static Object callOriginalObjectMethod(Object... params) {
-        throw new IllegalStateException("This should never be called");
+        throw dummyMethodCalled();
+    }
+
+    public static byte callOriginalByteMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
+    public static short callOriginalShortMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
+    public static int callOriginalIntMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
+    public static long callOriginalLongMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
+    public static float callOriginalFloatMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
+    public static double callOriginalDoubleMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
+    public static boolean callOriginalBooleanMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
+    public static char callOriginalCharMethod(Object... params) {
+        throw dummyMethodCalled();
+    }
+
+    private static IllegalStateException dummyMethodCalled() {
+        return new IllegalStateException("Dummy method should never be invoked");
     }
 
     /**

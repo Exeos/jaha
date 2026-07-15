@@ -200,4 +200,29 @@ public class ASMUtil implements Opcodes {
     public static String getInternalName(Class<?> clazz) {
         return clazz.getName().replace(".", "/");
     }
+
+    public static boolean isSpecial(String methodName) {
+        return methodName.equals("<init>") || methodName.equals("<clinit>");
+    }
+
+    public static int maxLocal(MethodNode methodNode) {
+        int max = getArgumentsSize(methodNode.desc);
+        for (AbstractInsnNode insnNode : methodNode.instructions) {
+            if (insnNode instanceof VarInsnNode) {
+                int var = ((VarInsnNode) insnNode).var;
+                if (var > max) {
+                    max = var;
+                }
+            }
+
+            if (insnNode instanceof IincInsnNode) {
+                int var = ((IincInsnNode) insnNode).var;
+                if (var > max) {
+                    max = var;
+                }
+            }
+        }
+
+        return max;
+    }
 }
