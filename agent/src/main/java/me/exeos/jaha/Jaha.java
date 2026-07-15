@@ -45,6 +45,7 @@ public class Jaha {
                 }
 
                 MethodNode hookMethodSource = methodHookSources.get(methodId);
+                // create a clone of @methodNode, replace calls to callOriginal* in @hookMethodSource to cloned method
                 methodCloner.cloneMethod(loader, className, methodNode, hookMethodSource);
 
                 targetClass.methods.remove(methodNode);
@@ -54,6 +55,7 @@ public class Jaha {
             return ASMUtil.getCNBytes(targetClass);
         }, true);
 
+        // retransform hooked classes in case they were loaded before transformer was added
         for (String className : hookSources.keySet()) {
             try {
                 inst.retransformClasses(Class.forName(className.replace("/", ".")));
