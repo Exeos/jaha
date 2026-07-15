@@ -1,7 +1,7 @@
 #include <jni.h>
 #include "me_exeos_jaha_util_NativeDefine.h"
 
-JNIEXPORT jclass JNICALL Java_me_exeos_jaha_util_NativeDefine_defineClass
+JNIEXPORT jclass JNICALL Java_me_exeos_jaha_util_NativeDefine_define
   (JNIEnv *env, jclass, jstring name, jbyteArray data, jobject loader) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     jsize len = env->GetArrayLength(data);

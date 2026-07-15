@@ -26,7 +26,7 @@ public class MemberAccessor {
         return UnsafeAccess.theUnsafe.getShort(ownerInstance, offset(owner, name));
     }
 
-    public static int getIntField(Object ownerInstance, String owner, String name) {
+    public static int getIntegerField(Object ownerInstance, String owner, String name) {
         return UnsafeAccess.theUnsafe.getInt(ownerInstance, offset(owner, name));
     }
 
@@ -46,7 +46,7 @@ public class MemberAccessor {
         return UnsafeAccess.theUnsafe.getBoolean(ownerInstance, offset(owner, name));
     }
 
-    public static char getCharField(Object ownerInstance, String owner, String name) {
+    public static char getCharacterField(Object ownerInstance, String owner, String name) {
         return UnsafeAccess.theUnsafe.getChar(ownerInstance, offset(owner, name));
     }
 
@@ -62,7 +62,7 @@ public class MemberAccessor {
         UnsafeAccess.theUnsafe.putShort(ownerInstance, offset(owner, name), value);
     }
 
-    public static void setIntField(Object ownerInstance, int value, String owner, String name) {
+    public static void setIntegerField(Object ownerInstance, int value, String owner, String name) {
         UnsafeAccess.theUnsafe.putInt(ownerInstance, offset(owner, name), value);
     }
 
@@ -82,7 +82,7 @@ public class MemberAccessor {
         UnsafeAccess.theUnsafe.putBoolean(ownerInstance, offset(owner, name), value);
     }
 
-    public static void setCharField(Object ownerInstance, char value, String owner, String name) {
+    public static void setCharacterField(Object ownerInstance, char value, String owner, String name) {
         UnsafeAccess.theUnsafe.putChar(ownerInstance, offset(owner, name), value);
     }
 
@@ -98,7 +98,7 @@ public class MemberAccessor {
 
     public static native short callShortMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native int callIntMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native int callIntegerMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
     public static native long callLongMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
@@ -108,7 +108,7 @@ public class MemberAccessor {
 
     public static native boolean callBooleanMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
-    public static native char callCharMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native char callCharacterMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
 
     private static long offset(String owner, String name) {
         String cacheKey = owner + name;

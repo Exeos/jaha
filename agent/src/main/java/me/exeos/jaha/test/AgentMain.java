@@ -9,6 +9,6 @@ public class AgentMain {
     public static void premain(String idk, Instrumentation is) {
         Jaha.register(ToStringHook.class);
 
-        Jaha.load(is);
+        Jaha.applyHooks(is);
     }
 }
