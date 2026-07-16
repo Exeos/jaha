@@ -77,6 +77,46 @@ This has been hooked: -1604796949
 
 ---
 
+## API
+
+- `Jaha.applyHooks(Instrumentation inst)`  
+  Applies all registered hooks
+
+- `register(Class<?> hookSource)`  
+  Registers a hook class
+
+- `callOriginalVoidMethod(Object... params)`  
+  Calls original method when return type is `void`.
+
+- `callOriginalObjectMethod(Object... params)`  
+  Calls original method when return type is an object. (cast the result)
+
+- `callOriginalByteMethod(Object... params)`  
+  Calls original method when return type is `byte`.
+
+- `callOriginalShortMethod(Object... params)`  
+  Calls original method when return type is `short`.
+
+- `callOriginalIntMethod(Object... params)`  
+  Calls original method when return type is `int`.
+
+- `callOriginalLongMethod(Object... params)`  
+  Calls original method when return type is `long`.
+
+- `callOriginalFloatMethod(Object... params)`  
+  Calls original method when return type is `float`.
+
+- `callOriginalDoubleMethod(Object... params)`  
+  Calls original method when return type is `double`.
+
+- `callOriginalBooleanMethod(Object... params)`  
+  Calls original method when return type is `boolean`.
+
+- `callOriginalCharMethod(Object... params)`  
+  Calls original method when return type is `char`.
+
+---
+
 ## License
 
 This project is [LICENSED](./LICENSE) under the **GPL-3.0**.
