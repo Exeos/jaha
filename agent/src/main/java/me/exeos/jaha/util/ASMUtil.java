@@ -97,6 +97,17 @@ public class ASMUtil implements Opcodes {
         return size;
     }
 
+    public static int getLastArgumentSlot(String methodDescriptor) {
+        int slot = 0;
+        Type[] types = Type.getArgumentTypes(methodDescriptor);
+
+        for (int i = 0; i < types.length - 1; i++) {
+            slot += types[i].getSize();
+        }
+
+        return slot;
+    }
+
     /**
      * Remaps indexes of locals so they don't collide with newly added params
      *
@@ -205,12 +216,14 @@ public class ASMUtil implements Opcodes {
         return methodName.equals("<init>") || methodName.equals("<clinit>");
     }
 
-    public static int maxLocal(MethodNode methodNode) {
+    public static int getFirstFreeLocalSlot(MethodNode methodNode) {
         int max = getArgumentsSize(methodNode.desc);
+        boolean localMax = false;
         for (AbstractInsnNode insnNode : methodNode.instructions) {
             if (insnNode instanceof VarInsnNode) {
                 int var = ((VarInsnNode) insnNode).var;
                 if (var > max) {
+                    localMax = true;
                     max = var;
                 }
             }
@@ -218,11 +231,12 @@ public class ASMUtil implements Opcodes {
             if (insnNode instanceof IincInsnNode) {
                 int var = ((IincInsnNode) insnNode).var;
                 if (var > max) {
+                    localMax = true;
                     max = var;
                 }
             }
         }
 
-        return max;
+        return (localMax ? max + 1 : max);
     }
 }
