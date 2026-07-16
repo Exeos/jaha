@@ -8,10 +8,6 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -29,49 +25,98 @@ public class MethodCloner implements Opcodes {
      */
     private int clonedMethodCount = 0;
 
+    /**
+     * Clones {@code originalMethod} into the container class associated with {@code ownerLoader},
+     * then rewrites {@code Jaha.callOriginal*} placeholder calls inside {@code hookedMethod} to
+     * invoke that clone instead.
+     *
+     * @param ownerLoader    the classloader that will load the class being hooked
+     * @param methodOwner    internal name of the class the original method belongs to
+     * @param originalMethod the un-hooked method, about to be cloned
+     * @param hookedMethod   the hook implementation that will replace it
+     */
     public void cloneMethod(ClassLoader ownerLoader, String methodOwner, MethodNode originalMethod, MethodNode hookedMethod) {
-        boolean isStatic = ASMUtil.hasAccess(originalMethod.access, ACC_STATIC);
-        ClassNode container = getOrCreateContainer(ownerLoader);
+        boolean isOriginalStatic = ASMUtil.hasAccess(originalMethod.access, ACC_STATIC);
         Type originalMethodType = Type.getMethodType(originalMethod.desc);
-        Type originalRetMethodType = originalMethodType.getReturnType();
+        Type orignalMethodRetType = originalMethodType.getReturnType();
+
+        ClassNode container = getOrCreateContainer(ownerLoader);
         MethodNode clone = new MethodNode(
                 ACC_PUBLIC | ACC_STATIC,
                 String.valueOf(clonedMethodCount++),
-                isStatic
-                        ? "([Ljava/lang/Object;)" + originalRetMethodType.getDescriptor()
-                        : "([Ljava/lang/Object;L" + methodOwner + ";)" + originalRetMethodType.getDescriptor(),
+                isOriginalStatic
+                        ? "([Ljava/lang/Object;)" + orignalMethodRetType.getDescriptor()
+                        : "([Ljava/lang/Object;L" + methodOwner + ";)" + orignalMethodRetType.getDescriptor(),
                 null,
                 originalMethod.exceptions.toArray(new String[0])
         );
-        clone.instructions = ASMUtil.clone(originalMethod.instructions);
 
-        int argumentSize = ASMUtil.getArgumentsSize(clone.desc);
-        int lastArgSlot = ASMUtil.getLastArgumentSlot(clone.desc);
-        if (!isStatic) {
-            // because method is no longer static, slot 0 no longer represents "this"
-            ASMUtil.loop(clone.instructions, insnNode -> {
-                if (insnNode instanceof VarInsnNode) {
-                    VarInsnNode varInsnNode = (VarInsnNode) insnNode;
-                    if (varInsnNode.var == 0) {
-                        varInsnNode.var = lastArgSlot;
-                    } else if (varInsnNode.var < argumentSize) {
-                        varInsnNode.var--;
-                    }
-                }
+        // clone instructions and tcb's
+        ASMUtil.cloneMethodInsn(originalMethod, clone);
 
-                if (insnNode instanceof IincInsnNode) {
-                    IincInsnNode iincInsnNode = (IincInsnNode) insnNode;
-                    if (iincInsnNode.var < argumentSize) {
-                        iincInsnNode.var--;
-                    }
-                }
-            });
+        if (!isOriginalStatic) {
+            remapInstanceLocals(clone);
         }
 
         fixMemberAccess(clone);
+        unpackArgArrayIntoLocals(clone, originalMethodType.getArgumentTypes());
+        replaceCallsToDummyOriginal(container, hookedMethod, clone, isOriginalStatic);
 
+        container.methods.add(clone);
+    }
+
+    /**
+     * Defines all generated container classes using their associated {@link ClassLoader}.
+     */
+    public void defineContainerClasses() {
+        for (Map.Entry<ClassLoader, ClassNode> entry : containers.entrySet()) {
+            NativeDefine.defineClassNode(
+                    entry.getValue(), // container class
+                    entry.getKey()    // original method's ClassLoader
+            );
+        }
+    }
+
+
+    /**
+     * The clone is static, so the original {@code this} (old local slot 0) now references the first argument.
+     * Original {@code this} is now passed as the clone's last parameter instead.
+     * <p>
+     * This shifts every old argument ref down and replaces ref 0 (old instance) with slot of passed instance
+     * Effectively converting virtual method convention to static method convention
+     */
+    private void remapInstanceLocals(MethodNode clone) {
+        int argumentSize = ASMUtil.getArgumentsSize(clone.desc);
+        int lastArgSlot = ASMUtil.getLastArgumentSlot(clone.desc);
+
+        ASMUtil.loop(clone.instructions, insnNode -> {
+            if (insnNode instanceof VarInsnNode) {
+                VarInsnNode varInsnNode = (VarInsnNode) insnNode;
+                if (varInsnNode.var == 0) {
+                    varInsnNode.var = lastArgSlot;
+                } else if (varInsnNode.var < argumentSize) {
+                    varInsnNode.var--;
+                }
+            }
+
+            if (insnNode instanceof IincInsnNode) {
+                IincInsnNode iincInsnNode = (IincInsnNode) insnNode;
+                if (iincInsnNode.var < argumentSize) {
+                    iincInsnNode.var--;
+                }
+            }
+        });
+    }
+
+    /**
+     * Prepends code to the clone that reads each element out of the leading {@code Object[]}
+     * parameter, unboxes it and stores it into a new local.
+     * Then remaps every reference to the corresponding original parameter slot to the corresponding, unboxed local.
+     * This lets the clone's body run exactly as before, now sourcing its parameters from the array instead
+     * of from real JVM parameter slots.
+     */
+    private void unpackArgArrayIntoLocals(MethodNode clone, Type[] argTypes) {
         int newSlot = ASMUtil.getFirstFreeLocalSlot(clone);
-        Type[] argTypes = originalMethodType.getArgumentTypes();
         Map<Integer, Integer> argLocals = new HashMap<>();
 
         InsnList storeToLocal = new InsnList();
@@ -84,16 +129,12 @@ public class MethodCloner implements Opcodes {
 
             if (TypeUtil.isPrimitive(argType)) {
                 String primInternalName = TypeUtil.getTypeClassInternalName(argType);
-                String toPrimitiveMethodName = TypeUtil.getTypeName(argType).toLowerCase()
-                        .replace("integer", "int")
-                        .replace("character", "char")
-                        + "Value";
 
                 storeToLocal.add(new TypeInsnNode(CHECKCAST, primInternalName));
                 storeToLocal.add(new MethodInsnNode(
                         INVOKEVIRTUAL,
                         primInternalName,
-                        toPrimitiveMethodName,
+                        TypeUtil.unboxingMethodName(argType),
                         "()" + argType.getDescriptor()
                 ));
             } else {
@@ -121,35 +162,6 @@ public class MethodCloner implements Opcodes {
             }
         });
         clone.instructions.insertBefore(clone.instructions.getFirst(), storeToLocal);
-
-        replaceCallsToDummyOriginal(container, hookedMethod, clone, isStatic);
-
-        container.methods.add(clone);
-
-        try {
-            ClassNode cn = new ClassNode(ASMUtil.ASM_VERSION);
-            cn.visit(Opcodes.V1_8, ACC_PUBLIC, methodOwner, null, "java/lang/Object", null);
-            cn.methods.add(hookedMethod);
-            cn.methods.add(clone);
-
-            Path path = Paths.get(System.getProperty("user.dir"), cn.name);
-            System.out.println(path);
-            Files.write(path, ASMUtil.getCNBytes(cn));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Defines all generated container classes using their associated {@link ClassLoader}.
-     */
-    public void defineContainerClasses() {
-        for (Map.Entry<ClassLoader, ClassNode> entry : containers.entrySet()) {
-            NativeDefine.defineClassNode(
-                    entry.getValue(), // container class
-                    entry.getKey()    // original method's ClassLoader
-            );
-        }
     }
 
     /**
@@ -160,132 +172,149 @@ public class MethodCloner implements Opcodes {
      * @param clonedMethod Method to rewrite
      */
     private void fixMemberAccess(MethodNode clonedMethod) {
-        AtomicInteger newLocalStart = new AtomicInteger(ASMUtil.getFirstFreeLocalSlot(clonedMethod));
-        int objArrSlot = newLocalStart.getAndAdd(1);
+        AtomicInteger newLocalsStart = new AtomicInteger(ASMUtil.getFirstFreeLocalSlot(clonedMethod));
+        int argArraySlot = newLocalsStart.getAndAdd(1);
 
         ASMUtil.loop(clonedMethod.instructions, insnNode -> {
             int opcode = insnNode.getOpcode();
             if (insnNode instanceof FieldInsnNode) {
-                FieldInsnNode fieldInsnNode = (FieldInsnNode) insnNode;
-                Type fieldType = Type.getType(fieldInsnNode.desc);
-                boolean isGet = opcode == GETSTATIC || opcode == GETFIELD;
-
-                String methodName = (isGet ? "get" : "set") + TypeUtil.getTypeName(fieldType) + "Field";
-                String methodDesc = "("
-                        + "Ljava/lang/Object;" // Object ownerInstance
-                        + (!isGet ? fieldType.getDescriptor() : "") // For set?Field: ? value
-                        + "Ljava/lang/String;" // String owner
-                        + "Ljava/lang/String;" // String name
-                        + ")"
-                        + (isGet ? fieldType.getDescriptor() : "V");
-
-                InsnList replacement = new InsnList();
-                // push null onto stack if access is static. Swap stack if type is PUT because null needs to be below value, that is already on stack
-                if (opcode == GETSTATIC || opcode == PUTSTATIC) {
-                    replacement.add(new InsnNode(ACONST_NULL));
-                    if (opcode == PUTSTATIC) {
-                        if (fieldType.getSize() == 2) {
-                            replacement.add(new InsnNode(DUP_X2));
-                            replacement.add(new InsnNode(POP));
-                        } else {
-                            replacement.add(new InsnNode(SWAP));
-                        }
-                    }
-                }
-
-                replacement.add(new LdcInsnNode(fieldInsnNode.owner));
-                replacement.add(new LdcInsnNode(fieldInsnNode.name));
-                replacement.add(new MethodInsnNode(
-                        INVOKESTATIC,
-                        ASMUtil.getInternalName(MemberAccessor.class),
-                        methodName,
-                        methodDesc)
-                );
-
-
-                clonedMethod.instructions.insertBefore(insnNode, replacement);
-                clonedMethod.instructions.remove(insnNode);
+                fixFieldAccess(clonedMethod, (FieldInsnNode) insnNode);
             }
 
             if (insnNode instanceof MethodInsnNode) {
-                MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
-                if (ASMUtil.isSpecial(methodInsnNode.name)) {
-                    return;
-                }
-
-                Type methodType = Type.getMethodType(methodInsnNode.desc);
-                Type methodReturnType = methodType.getReturnType();
-                boolean returnsPrimitive = TypeUtil.isPrimitive(methodReturnType);
-
-                String methodName = "call" + TypeUtil.getTypeName(methodReturnType) + "Method";
-                String methodDesc = "("
-                        + "Ljava/lang/Object;" // Object ownerInstance
-                        + "[Ljava/lang/Object;" // Object[] args
-                        + "Ljava/lang/Class;" // Class<?> owner
-                        + "Ljava/lang/String;" // String name
-                        + "Ljava/lang/String;" // String desc
-                        + ")"
-                        + (returnsPrimitive ? methodReturnType.getDescriptor() : "Ljava/lang/Object;");
-
-                Type[] argTypes = methodType.getArgumentTypes();
-                int[] paramLocals = new int[argTypes.length];
-                for (int i = 0; i < argTypes.length; i++) {
-                    paramLocals[i] = newLocalStart.getAndAdd(argTypes[i].getSize());
-                }
-
-                InsnList replacement = new InsnList();
-
-                // store arguments, that are currently on the stack into locals to avoid hacky stack manipulation
-                for (int i = argTypes.length - 1; i >= 0; i--) {
-                    replacement.add(new VarInsnNode(argTypes[i].getOpcode(ISTORE), paramLocals[i]));
-                }
-
-                // put arguments stored in locals into Object[]
-                replacement.add(ASMUtil.getIntPush(argTypes.length));
-                replacement.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
-                replacement.add(new VarInsnNode(ASTORE, objArrSlot));
-                for (int i = 0; i < argTypes.length; i++) {
-                    Type arguemtType = methodType.getArgumentTypes()[i];
-
-                    replacement.add(new VarInsnNode(ALOAD, objArrSlot));
-                    replacement.add(ASMUtil.getIntPush(i));
-                    replacement.add(new VarInsnNode(arguemtType.getOpcode(ILOAD), paramLocals[i]));
-                    if (TypeUtil.isPrimitive(arguemtType)) {
-                        String primitiveClassName = TypeUtil.getTypeClassInternalName(arguemtType);
-                        replacement.add(new MethodInsnNode(
-                                INVOKESTATIC,
-                                primitiveClassName,
-                                "valueOf",
-                                "("
-                                        + arguemtType.getDescriptor()
-                                        + ")L"
-                                        + primitiveClassName
-                                        + ";"
-                        ));
-                    }
-                    replacement.add(new InsnNode(AASTORE));
-                }
-
-                if (opcode == INVOKESTATIC) {
-                    replacement.add(new InsnNode(ACONST_NULL));
-                }
-                // stack: null if static call, instance object if virtual
-
-                // push argument Object[]
-                replacement.add(new VarInsnNode(ALOAD, objArrSlot));
-
-                replacement.add(new LdcInsnNode(Type.getObjectType(methodInsnNode.owner)));
-                replacement.add(new LdcInsnNode(methodInsnNode.name));
-                replacement.add(new LdcInsnNode(methodInsnNode.desc));
-                replacement.add(new MethodInsnNode(INVOKESTATIC, ASMUtil.getInternalName(MemberAccessor.class), methodName, methodDesc));
-                if (!returnsPrimitive) {
-                    replacement.add(new TypeInsnNode(CHECKCAST, methodType.getReturnType().getInternalName()));
-                }
-
-                clonedMethod.instructions.insertBefore(insnNode, replacement);
-                clonedMethod.instructions.remove(insnNode);
+                fixMethodInvocation(clonedMethod, (MethodInsnNode) insnNode, newLocalsStart, argArraySlot);
             }
         });
+    }
+
+
+    /**
+     * Replaces Field instructions with an equivalent call
+     * to the matching {@code MemberAccessor.get*Field}/{@code set*Field} method.
+     */
+    private void fixFieldAccess(MethodNode clonedMethod, FieldInsnNode fieldInsnNode) {
+        int opcode = fieldInsnNode.getOpcode();
+        Type fieldType = Type.getType(fieldInsnNode.desc);
+        boolean isGet = opcode == GETSTATIC || opcode == GETFIELD;
+
+        String methodName = (isGet ? "get" : "set") + TypeUtil.getTypeName(fieldType) + "Field";
+        String methodDesc = "("
+                + "Ljava/lang/Object;" // Object ownerInstance
+                + (!isGet ? fieldType.getDescriptor() : "") // For set?Field: ? value
+                + "Ljava/lang/String;" // String owner
+                + "Ljava/lang/String;" // String name
+                + ")"
+                + (isGet ? fieldType.getDescriptor() : "V");
+
+        InsnList replacement = new InsnList();
+        // push null onto stack if access is static. Swap stack if type is PUT because null needs to be below value, that is already on stack
+        if (opcode == GETSTATIC || opcode == PUTSTATIC) {
+            replacement.add(new InsnNode(ACONST_NULL));
+            if (opcode == PUTSTATIC) {
+                if (fieldType.getSize() == 2) {
+                    replacement.add(new InsnNode(DUP_X2));
+                    replacement.add(new InsnNode(POP));
+                } else {
+                    replacement.add(new InsnNode(SWAP));
+                }
+            }
+        }
+
+        replacement.add(new LdcInsnNode(fieldInsnNode.owner));
+        replacement.add(new LdcInsnNode(fieldInsnNode.name));
+        replacement.add(new MethodInsnNode(
+                INVOKESTATIC,
+                ASMUtil.getInternalName(MemberAccessor.class),
+                methodName,
+                methodDesc)
+        );
+
+
+        clonedMethod.instructions.insertBefore(fieldInsnNode, replacement);
+        clonedMethod.instructions.remove(fieldInsnNode);
+    }
+
+    /**
+     * Replaces an INVOKE* instruction with an equivalent call to the matching
+     * {@code MemberAccessor.call*Method}
+     */
+    private void fixMethodInvocation(MethodNode clonedMethod, MethodInsnNode methodInsnNode, AtomicInteger freeLocal, int argArraySlot) {
+        if (ASMUtil.isSpecial(methodInsnNode.name)) {
+            return;
+        }
+
+        int opcode = methodInsnNode.getOpcode();
+        Type methodType = Type.getMethodType(methodInsnNode.desc);
+        Type methodReturnType = methodType.getReturnType();
+        boolean returnsPrimitive = TypeUtil.isPrimitive(methodReturnType);
+
+        String methodName = "call" + TypeUtil.getTypeName(methodReturnType) + "Method";
+        String methodDesc = "("
+                + "Ljava/lang/Object;" // Object ownerInstance
+                + "[Ljava/lang/Object;" // Object[] args
+                + "Ljava/lang/Class;" // Class<?> owner
+                + "Ljava/lang/String;" // String name
+                + "Ljava/lang/String;" // String desc
+                + ")"
+                + (returnsPrimitive ? methodReturnType.getDescriptor() : "Ljava/lang/Object;");
+
+        Type[] argTypes = methodType.getArgumentTypes();
+        int[] paramLocals = new int[argTypes.length];
+        for (int i = 0; i < argTypes.length; i++) {
+            paramLocals[i] = freeLocal.getAndAdd(argTypes[i].getSize());
+        }
+
+        InsnList replacement = new InsnList();
+
+        // store arguments, that are currently on the stack into locals to avoid hacky stack manipulation
+        for (int i = argTypes.length - 1; i >= 0; i--) {
+            replacement.add(new VarInsnNode(argTypes[i].getOpcode(ISTORE), paramLocals[i]));
+        }
+
+        // put arguments stored in locals into Object[]
+        replacement.add(ASMUtil.getIntPush(argTypes.length));
+        replacement.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
+        replacement.add(new VarInsnNode(ASTORE, argArraySlot));
+        for (int i = 0; i < argTypes.length; i++) {
+            Type arguemtType = methodType.getArgumentTypes()[i];
+
+            replacement.add(new VarInsnNode(ALOAD, argArraySlot));
+            replacement.add(ASMUtil.getIntPush(i));
+            replacement.add(new VarInsnNode(arguemtType.getOpcode(ILOAD), paramLocals[i]));
+            if (TypeUtil.isPrimitive(arguemtType)) {
+                String primitiveClassName = TypeUtil.getTypeClassInternalName(arguemtType);
+                replacement.add(new MethodInsnNode(
+                        INVOKESTATIC,
+                        primitiveClassName,
+                        "valueOf",
+                        "("
+                                + arguemtType.getDescriptor()
+                                + ")L"
+                                + primitiveClassName
+                                + ";"
+                ));
+            }
+            replacement.add(new InsnNode(AASTORE));
+        }
+
+        if (opcode == INVOKESTATIC) {
+            replacement.add(new InsnNode(ACONST_NULL));
+        }
+        // stack: null if static call, instance object if virtual
+
+        // push argument Object[]
+        replacement.add(new VarInsnNode(ALOAD, argArraySlot));
+
+        replacement.add(new LdcInsnNode(Type.getObjectType(methodInsnNode.owner)));
+        replacement.add(new LdcInsnNode(methodInsnNode.name));
+        replacement.add(new LdcInsnNode(methodInsnNode.desc));
+        replacement.add(new MethodInsnNode(INVOKESTATIC, ASMUtil.getInternalName(MemberAccessor.class), methodName, methodDesc));
+        if (!returnsPrimitive) {
+            replacement.add(new TypeInsnNode(CHECKCAST, methodType.getReturnType().getInternalName()));
+        }
+
+        clonedMethod.instructions.insertBefore(methodInsnNode, replacement);
+        clonedMethod.instructions.remove(methodInsnNode);
     }
 
     /**

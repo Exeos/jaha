@@ -55,4 +55,15 @@ public class TypeUtil {
 
         return TYPE_TO_CLASS.get(type.getSort()).getSimpleName();
     }
+
+    public static String unboxingMethodName(Type primitiveType) {
+        if (!isPrimitive(primitiveType)) {
+            throw new IllegalArgumentException("Can't unbox none primitive type: " + primitiveType.getSort());
+        }
+
+        return TypeUtil.getTypeName(primitiveType).toLowerCase()
+                .replace("integer", "int")
+                .replace("character", "char")
+                + "Value";
+    }
 }

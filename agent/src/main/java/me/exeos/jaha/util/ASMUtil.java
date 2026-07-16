@@ -65,13 +65,20 @@ public class ASMUtil implements Opcodes {
         return (access & toCheck) != 0;
     }
 
-    /**
-     * Clone InsnList, so you keep the instructions without causing breakage to related Objects
-     *
-     * @param source InsnList to clone
-     * @return Cloned InsnList
-     */
-    public static InsnList clone(InsnList source) {
+    public static void cloneMethodInsn(MethodNode source, MethodNode target) {
+        Map<LabelNode, LabelNode> labelMap = labelMapForClone(source.instructions);
+        target.instructions = clone(source.instructions, labelMap);
+        for (TryCatchBlockNode tryCatchBlock : source.tryCatchBlocks) {
+            target.tryCatchBlocks.add(new TryCatchBlockNode(
+                    labelMap.get(tryCatchBlock.start),
+                    labelMap.get(tryCatchBlock.end),
+                    labelMap.get(tryCatchBlock.handler),
+                    tryCatchBlock.type
+            ));
+        }
+    }
+
+    public static Map<LabelNode, LabelNode> labelMapForClone(InsnList source) {
         Map<LabelNode, LabelNode> labelMap = new HashMap<>();
         for (AbstractInsnNode insn : source.toArray()) {
             if (insn instanceof LabelNode) {
@@ -79,6 +86,26 @@ public class ASMUtil implements Opcodes {
             }
         }
 
+        return labelMap;
+    }
+
+    /**
+     * Clone InsnList, so you keep the instructions without causing breakage to related Objects
+     *
+     * @param source InsnList to clone
+     * @return Cloned InsnList
+     */
+    public static InsnList clone(InsnList source) {
+        return clone(source, labelMapForClone(source));
+    }
+
+    /**
+     * Clone InsnList, so you keep the instructions without causing breakage to related Objects
+     *
+     * @param source InsnList to clone
+     * @return Cloned InsnList
+     */
+    public static InsnList clone(InsnList source, Map<LabelNode, LabelNode> labelMap) {
         InsnList copy = new InsnList();
         for (AbstractInsnNode insn : source.toArray()) {
             copy.add(insn.clone(labelMap));
