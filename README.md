@@ -77,6 +77,44 @@ This has been hooked: -1604796949
 
 ---
 
+## How does this work?
+
+JAHA hooks methods by rewriting bytecode using Instrumentation.
+
+### 1) Register hook sources
+
+You register classes annotated with `@Hook(target = "...")` using `Jaha.register(...)`.
+
+Each hook class provides replacement methods annotated with `@Apply`
+
+### 2) Applying the hooks
+
+`Jaha.applyHooks(inst)` installs a `ClassFileTransformer`.
+
+When a target class is transformed, JAHA:
+
+- parses the target bytecode
+- finds matching `@Apply` methods in the hook source
+- replaces target method bodies with hook method bodies
+
+### 3) Preserve original behavior
+
+Before replacing a method, JAHA clones the original implementation into an internal runtime container Class.
+
+This copy is what “original method” calls are routed to.
+
+### 4) Rewrite `Jaha.callOriginalXMethod(...)`
+
+Inside hook methods, calls like:
+
+- `Jaha.callOriginalObjectMethod(...)`
+- `Jaha.callOriginalIntMethod(...)`
+- etc.
+
+are placeholders. During transformation, JAHA rewrites these calls to invoke the cloned original implementation.
+
+---
+
 ## API
 
 - `Jaha.applyHooks(Instrumentation inst)`  
