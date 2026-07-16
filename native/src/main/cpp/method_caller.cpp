@@ -219,7 +219,7 @@ JNIEXPORT jshort JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callShortMeth
     return result;
 }
 
-JNIEXPORT jint JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callIntMethod
+JNIEXPORT jint JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callIntegerMethod
 (JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);
@@ -330,7 +330,7 @@ JNIEXPORT jboolean JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callBoolean
     return result;
 }
 
-JNIEXPORT jchar JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callCharMethod
+JNIEXPORT jchar JNICALL Java_me_exeos_jaha_runtime_MemberAccessor_callCharacterMethod
 (JNIEnv *env, jclass, jobject ownerInstance, jobjectArray argsArray, jclass ownerClass, jstring name, jstring desc) {
     const char *nameChars = env->GetStringUTFChars(name, nullptr);
     const char *descChars = env->GetStringUTFChars(desc, nullptr);

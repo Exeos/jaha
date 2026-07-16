@@ -108,6 +108,19 @@ public class ASMUtil implements Opcodes {
         return slot;
     }
 
+    public static int getArgumentSlot(Type[] args, int argIndex) {
+        int slot = 0;
+
+        for (int i = 0; i < args.length; i++) {
+            if (i == argIndex)
+                break;
+
+            slot += args[i].getSize();
+        }
+
+        return slot;
+    }
+
     /**
      * Remaps indexes of locals so they don't collide with newly added params
      *
@@ -218,25 +231,30 @@ public class ASMUtil implements Opcodes {
 
     public static int getFirstFreeLocalSlot(MethodNode methodNode) {
         int max = getArgumentsSize(methodNode.desc);
-        boolean localMax = false;
         for (AbstractInsnNode insnNode : methodNode.instructions) {
             if (insnNode instanceof VarInsnNode) {
-                int var = ((VarInsnNode) insnNode).var;
-                if (var > max) {
-                    localMax = true;
-                    max = var;
-                }
+                VarInsnNode varInsn = (VarInsnNode) insnNode;
+                int size = isWide(varInsn.getOpcode()) ? 2 : 1;
+                max = Math.max(max, varInsn.var + size);
             }
 
             if (insnNode instanceof IincInsnNode) {
-                int var = ((IincInsnNode) insnNode).var;
-                if (var > max) {
-                    localMax = true;
-                    max = var;
-                }
+                max = Math.max(max, ((IincInsnNode) insnNode).var + 1);
             }
         }
 
-        return (localMax ? max + 1 : max);
+        return max;
+    }
+
+    public static boolean isWide(int opcode) {
+        switch (opcode) {
+            case Opcodes.LLOAD:
+            case Opcodes.LSTORE:
+            case Opcodes.DLOAD:
+            case Opcodes.DSTORE:
+                return true;
+            default:
+                return false;
+        }
     }
 }

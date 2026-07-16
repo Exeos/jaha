@@ -32,20 +32,22 @@ public class MethodCloner implements Opcodes {
     public void cloneMethod(ClassLoader ownerLoader, String methodOwner, MethodNode originalMethod, MethodNode hookedMethod) {
         boolean isStatic = ASMUtil.hasAccess(originalMethod.access, ACC_STATIC);
         ClassNode container = getOrCreateContainer(ownerLoader);
+        Type originalMethodType = Type.getMethodType(originalMethod.desc);
+        Type originalRetMethodType = originalMethodType.getReturnType();
         MethodNode clone = new MethodNode(
                 ACC_PUBLIC | ACC_STATIC,
                 String.valueOf(clonedMethodCount++),
                 isStatic
-                        ? originalMethod.desc
-                        : originalMethod.desc.replace(")", "L" + methodOwner + ";)"),
+                        ? "([Ljava/lang/Object;)" + originalRetMethodType.getDescriptor()
+                        : "([Ljava/lang/Object;L" + methodOwner + ";)" + originalRetMethodType.getDescriptor(),
                 null,
                 originalMethod.exceptions.toArray(new String[0])
         );
         clone.instructions = ASMUtil.clone(originalMethod.instructions);
 
+        int argumentSize = ASMUtil.getArgumentsSize(clone.desc);
         int lastArgSlot = ASMUtil.getLastArgumentSlot(clone.desc);
         if (!isStatic) {
-            int argumentSize = ASMUtil.getArgumentsSize(clone.desc);
             // because method is no longer static, slot 0 no longer represents "this"
             ASMUtil.loop(clone.instructions, insnNode -> {
                 if (insnNode instanceof VarInsnNode) {
@@ -65,18 +67,72 @@ public class MethodCloner implements Opcodes {
                 }
             });
         }
+
         fixMemberAccess(clone);
-        replaceCallsToDummyOriginal(container, hookedMethod, clone, isStatic, lastArgSlot);
+
+        int newSlot = ASMUtil.getFirstFreeLocalSlot(clone);
+        Type[] argTypes = originalMethodType.getArgumentTypes();
+        Map<Integer, Integer> argLocals = new HashMap<>();
+
+        InsnList storeToLocal = new InsnList();
+        for (int i = 0; i < argTypes.length; i++) {
+            Type argType = argTypes[i];
+
+            storeToLocal.add(new VarInsnNode(ALOAD, 0)); // load obj[]
+            storeToLocal.add(ASMUtil.getIntPush(i));
+            storeToLocal.add(new InsnNode(AALOAD));
+
+            if (TypeUtil.isPrimitive(argType)) {
+                String primInternalName = TypeUtil.getTypeClassInternalName(argType);
+                String toPrimitiveMethodName = TypeUtil.getTypeName(argType).toLowerCase()
+                        .replace("integer", "int")
+                        .replace("character", "char")
+                        + "Value";
+
+                storeToLocal.add(new TypeInsnNode(CHECKCAST, primInternalName));
+                storeToLocal.add(new MethodInsnNode(
+                        INVOKEVIRTUAL,
+                        primInternalName,
+                        toPrimitiveMethodName,
+                        "()" + argType.getDescriptor()
+                ));
+            } else {
+                storeToLocal.add(new TypeInsnNode(CHECKCAST, argType.getInternalName()));
+            }
+            storeToLocal.add(new VarInsnNode(argType.getOpcode(ISTORE), newSlot));
+
+            argLocals.put(ASMUtil.getArgumentSlot(argTypes, i), newSlot);
+            newSlot += argType.getSize();
+        }
+
+        ASMUtil.loop(clone.instructions, insnNode -> {
+            if (insnNode instanceof VarInsnNode) {
+                VarInsnNode varInsnNode = (VarInsnNode) insnNode;
+                if (argLocals.containsKey(varInsnNode.var)) {
+                    varInsnNode.var = argLocals.get(varInsnNode.var);
+                }
+            }
+
+            if (insnNode instanceof IincInsnNode) {
+                IincInsnNode iincInsnNode = (IincInsnNode) insnNode;
+                if (argLocals.containsKey(iincInsnNode.var)) {
+                    iincInsnNode.var = argLocals.get(iincInsnNode.var);
+                }
+            }
+        });
+        clone.instructions.insertBefore(clone.instructions.getFirst(), storeToLocal);
+
+        replaceCallsToDummyOriginal(container, hookedMethod, clone, isStatic);
 
         container.methods.add(clone);
 
         try {
             ClassNode cn = new ClassNode(ASMUtil.ASM_VERSION);
             cn.visit(Opcodes.V1_8, ACC_PUBLIC, methodOwner, null, "java/lang/Object", null);
-            cn.methods.add(originalMethod);
+            cn.methods.add(hookedMethod);
             cn.methods.add(clone);
 
-            Path path = Paths.get(System.getProperty("user.dir"), cn.name + "_" + container.name);
+            Path path = Paths.get(System.getProperty("user.dir"), cn.name);
             System.out.println(path);
             Files.write(path, ASMUtil.getCNBytes(cn));
         } catch (IOException e) {
@@ -239,7 +295,7 @@ public class MethodCloner implements Opcodes {
      * @param hookedMethod Method being rewritten
      * @param clone        Generated clone that should be called instead
      */
-    private void replaceCallsToDummyOriginal(ClassNode container, MethodNode hookedMethod, MethodNode clone, boolean isStatic, int thisSlot) {
+    private void replaceCallsToDummyOriginal(ClassNode container, MethodNode hookedMethod, MethodNode clone, boolean isStatic) {
         ASMUtil.loop(hookedMethod.instructions, insnNode -> {
             if (!(insnNode instanceof MethodInsnNode)) {
                 return;
@@ -251,7 +307,7 @@ public class MethodCloner implements Opcodes {
             }
 
             if (!isStatic) {
-                hookedMethod.instructions.insertBefore(insnNode, new VarInsnNode(Opcodes.ALOAD, thisSlot));
+                hookedMethod.instructions.insertBefore(insnNode, new VarInsnNode(Opcodes.ALOAD, 0));
             }
             hookedMethod.instructions.insertBefore(insnNode, new MethodInsnNode(Opcodes.INVOKESTATIC, container.name, clone.name, clone.desc));
             hookedMethod.instructions.remove(insnNode);

@@ -9,8 +9,8 @@ public class SCHook {
 
     @Apply
     public String deriveKey(int n) {
-        int original = Jaha.callOriginalIntMethod(n);
+        String original = (String) Jaha.callOriginalObjectMethod(1);
 
-        return String.valueOf(original + 2);
+        return original + "_lol";
     }
 }
