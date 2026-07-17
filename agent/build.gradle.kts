@@ -1,5 +1,6 @@
 plugins {
     id("java")
+    id("maven-publish")
     id("com.gradleup.shadow") version "8.3.5"
 }
 
@@ -22,6 +23,18 @@ dependencies {
     implementation("org.ow2.asm:asm-util:9.10.1")
     implementation("org.ow2.asm:asm-tree:9.10.1")
     implementation("org.ow2.asm:asm-analysis:9.10.1")
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            groupId = "me.exeos"
+            artifactId = "jaha"
+            version = "1.0.0"
+
+            artifact(tasks.shadowJar)
+        }
+    }
 }
 
 tasks.compileJava {
