@@ -37,14 +37,6 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 tasks.shadowJar {
-    manifest {
-        attributes(
-            "Premain-Class" to "me.exeos.jaha.test.AgentMain",
-            "Agent-Class" to "me.exeos.jaha.test.AgentMain",
-            "Can-Retransform-Classes" to "true",
-            "Can-Redefine-Classes" to "true",
-        )
-    }
     archiveClassifier.set("")
 }
 
