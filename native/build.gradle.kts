@@ -31,7 +31,7 @@ val buildTasks = targets.map { t ->
             "-I${includeDir.resolve(t.platformDir).absolutePath}", // jni_md.h
             "-I${generatedHeaderDir.get().asFile.absolutePath}",
             "define_class.cpp",
-            "method_caller.cpp",
+            "member_accessor.cpp",
             "-o", out.resolve(t.outputName).absolutePath
         )
     }

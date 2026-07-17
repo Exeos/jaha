@@ -79,6 +79,10 @@ public class Jaha {
         throw dummyMethodCalled();
     }
 
+//    public static <T> T callOriginalObjectMethod(Object... params) {
+//        throw  dummyMethodCalled();
+//    }
+
     public static Object callOriginalObjectMethod(Object... params) {
         throw dummyMethodCalled();
     }

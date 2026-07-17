@@ -203,8 +203,9 @@ public class MethodCloner implements Opcodes {
                 + (!isGet ? fieldType.getDescriptor() : "") // For set?Field: ? value
                 + "Ljava/lang/String;" // String owner
                 + "Ljava/lang/String;" // String name
+                + "Ljava/lang/String;" // String desc
                 + ")"
-                + (isGet ? fieldType.getDescriptor() : "V");
+                + (isGet ? (TypeUtil.isPrimitive(fieldType) ? fieldType.getDescriptor() : "Ljava/lang/Object;") : "V");
 
         InsnList replacement = new InsnList();
         // push null onto stack if access is static. Swap stack if type is PUT because null needs to be below value, that is already on stack
@@ -222,13 +223,13 @@ public class MethodCloner implements Opcodes {
 
         replacement.add(new LdcInsnNode(fieldInsnNode.owner));
         replacement.add(new LdcInsnNode(fieldInsnNode.name));
+        replacement.add(new LdcInsnNode(fieldInsnNode.desc));
         replacement.add(new MethodInsnNode(
                 INVOKESTATIC,
                 ASMUtil.getInternalName(MemberAccessor.class),
                 methodName,
                 methodDesc)
         );
-
 
         clonedMethod.instructions.insertBefore(fieldInsnNode, replacement);
         clonedMethod.instructions.remove(fieldInsnNode);
@@ -252,7 +253,7 @@ public class MethodCloner implements Opcodes {
         String methodDesc = "("
                 + "Ljava/lang/Object;" // Object ownerInstance
                 + "[Ljava/lang/Object;" // Object[] args
-                + "Ljava/lang/Class;" // Class<?> owner
+                + "Ljava/lang/String;" // String owner
                 + "Ljava/lang/String;" // String name
                 + "Ljava/lang/String;" // String desc
                 + ")"
@@ -305,7 +306,7 @@ public class MethodCloner implements Opcodes {
         // push argument Object[]
         replacement.add(new VarInsnNode(ALOAD, argArraySlot));
 
-        replacement.add(new LdcInsnNode(Type.getObjectType(methodInsnNode.owner)));
+        replacement.add(new LdcInsnNode(methodInsnNode.owner));
         replacement.add(new LdcInsnNode(methodInsnNode.name));
         replacement.add(new LdcInsnNode(methodInsnNode.desc));
         replacement.add(new MethodInsnNode(INVOKESTATIC, ASMUtil.getInternalName(MemberAccessor.class), methodName, methodDesc));

@@ -1,10 +1,5 @@
 package me.exeos.jaha.runtime;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Provides methods for bypassing access limitation.
  * This is required because we copy the original, unhooked methods into new classes.
@@ -12,124 +7,64 @@ import java.util.Map;
  */
 public class MemberAccessor {
 
-    private final static Map<String, Long> offsetCache = new HashMap<>();
-
     static {
         NativeLoader.ensureLoaded();
     }
 
-    public static byte getByteField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getByte(ownerInstance, offset(owner, name));
-    }
+    public static native byte getByteField(Object ownerInstance, String owner, String name, String desc);
 
-    public static short getShortField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getShort(ownerInstance, offset(owner, name));
-    }
+    public static native short getShortField(Object ownerInstance, String owner, String name, String desc);
 
-    public static int getIntegerField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getInt(ownerInstance, offset(owner, name));
-    }
+    public static native int getIntegerField(Object ownerInstance, String owner, String name, String desc);
 
-    public static long getLongField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getLong(ownerInstance, offset(owner, name));
-    }
+    public static native long getLongField(Object ownerInstance, String owner, String name, String desc);
 
-    public static float getFloatField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getFloat(ownerInstance, offset(owner, name));
-    }
+    public static native float getFloatField(Object ownerInstance, String owner, String name, String desc);
 
-    public static double getDoubleField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getDouble(ownerInstance, offset(owner, name));
-    }
+    public static native double getDoubleField(Object ownerInstance, String owner, String name, String desc);
 
-    public static boolean getBooleanField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getBoolean(ownerInstance, offset(owner, name));
-    }
+    public static native boolean getBooleanField(Object ownerInstance, String owner, String name, String desc);
 
-    public static char getCharacterField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getChar(ownerInstance, offset(owner, name));
-    }
+    public static native char getCharacterField(Object ownerInstance, String owner, String name, String desc);
 
-    public static Object getObjectField(Object ownerInstance, String owner, String name) {
-        return UnsafeAccess.theUnsafe.getObject(ownerInstance, offset(owner, name));
-    }
+    public static native Object getObjectField(Object ownerInstance, String owner, String name, String desc);
 
-    public static void setByteField(Object ownerInstance, byte value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putByte(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setByteField(Object ownerInstance, byte value, String owner, String name, String desc);
 
-    public static void setShortField(Object ownerInstance, short value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putShort(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setShortField(Object ownerInstance, short value, String owner, String name, String desc);
 
-    public static void setIntegerField(Object ownerInstance, int value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putInt(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setIntegerField(Object ownerInstance, int value, String owner, String name, String desc);
 
-    public static void setLongField(Object ownerInstance, long value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putLong(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setLongField(Object ownerInstance, long value, String owner, String name, String desc);
 
-    public static void setFloatField(Object ownerInstance, float value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putFloat(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setFloatField(Object ownerInstance, float value, String owner, String name, String desc);
 
-    public static void setDoubleField(Object ownerInstance, double value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putDouble(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setDoubleField(Object ownerInstance, double value, String owner, String name, String desc);
 
-    public static void setBooleanField(Object ownerInstance, boolean value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putBoolean(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setBooleanField(Object ownerInstance, boolean value, String owner, String name, String desc);
 
-    public static void setCharacterField(Object ownerInstance, char value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putChar(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setCharacterField(Object ownerInstance, char value, String owner, String name, String desc);
 
-    public static void setObjectField(Object ownerInstance, Object value, String owner, String name) {
-        UnsafeAccess.theUnsafe.putObject(ownerInstance, offset(owner, name), value);
-    }
+    public static native void setObjectField(Object ownerInstance, Object value, String owner, String name, String desc);
 
-    public static native void callVoidMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native void callVoidMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native Object callObjectMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native Object callObjectMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native byte callByteMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native byte callByteMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native short callShortMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native short callShortMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native int callIntegerMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native int callIntegerMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native long callLongMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native long callLongMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native float callFloatMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native float callFloatMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native double callDoubleMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native double callDoubleMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native boolean callBooleanMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native boolean callBooleanMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    public static native char callCharacterMethod(Object ownerInstance, Object[] args, Class<?> ownerClass, String name, String desc);
+    public static native char callCharacterMethod(Object ownerInstance, Object[] args, String owner, String name, String desc);
 
-    private static long offset(String owner, String name) {
-        String cacheKey = owner + name;
-        if (offsetCache.containsKey(cacheKey)) {
-            return offsetCache.get(cacheKey);
-        }
-
-        Field f = getField(owner, name);
-        long offset = Modifier.isStatic(f.getModifiers())
-                ? UnsafeAccess.theUnsafe.staticFieldOffset(f)
-                : UnsafeAccess.theUnsafe.objectFieldOffset(f);
-
-        offsetCache.put(cacheKey, offset);
-        return offset;
-    }
-
-    private static Field getField(String owner, String name) {
-        try {
-            return Class.forName(owner.replace("/", ".")).getDeclaredField(name);
-        } catch (NoSuchFieldException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
 }
